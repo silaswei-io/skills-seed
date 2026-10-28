@@ -12,7 +12,7 @@
 | Several patterns express the same thing | `patterns compact --dry-run`, then compact | Edit the database or runtime directly |
 | A long-lived team prohibition or contract | `rule` | Assume source can derive it |
 | Release, acceptance, deployment, or other task steps | `workflow` | Let source learning infer it as fact |
-| Authority files, structure, or module map changed | `learn current --profile refresh` | Hand-edit profile JSON |
+| Saved knowledge or generated navigation changed | `skills-seed generate skills` | Regenerate the projection |
 
 ## Reset Knowledge Before Relearning
 
@@ -25,7 +25,7 @@ When incorrect or stale knowledge affects a whole set of resources and individua
 | Remove only team Rules | `skills-seed reset rules` | Add needed `rule` resources again, then `generate skills` |
 | Remove only task Workflows | `skills-seed reset workflows` | Add needed `workflow` resources again, then `generate skills` |
 
-`patterns` also clears project profiles, file snapshots, resumable checkpoints, and learning history so the next `sync` cannot reuse stale analysis. Scopes can be combined, such as `skills-seed reset patterns rules`; `all` must stand alone, and a selective reset cannot be combined with `--mode`, `--workspace`, `--locale`, or `--skills-locale`.
+`patterns` also clears project profiles, resumable checkpoints, and learning history so the next `sync` cannot reuse stale analysis. Scopes can be combined, such as `skills-seed reset patterns rules`; `all` must stand alone, and a selective reset cannot be combined with `--mode`, `--workspace`, `--locale`, or `--skills-locale`.
 
 For one pattern, prefer `patterns update`; for interrupted learning, prefer `sync --resume`. Full `skills-seed reset` without a scope is for reinitializing or switching between project and workspace modes.
 
@@ -70,11 +70,10 @@ Use `--overwrite` only when the old body and scope must genuinely be discarded. 
 
 ## Project Profile and Durable Background
 
-Use `profile show` to inspect the current project profile. Refresh it when authority sources, structure, or module relationships changed:
+Use `profile show` to inspect the current project profile. Inspect the saved profile directly when navigation needs checking:
 
 ```bash
 skills-seed profile show
-skills-seed learn current --profile refresh
 skills-seed generate skills
 ```
 

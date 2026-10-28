@@ -17,7 +17,7 @@ import (
 // EngineeringKnowledgeRevision 返回项目级权威工程知识的内容版本。
 // 空项目不产生版本，避免没有权威来源的已有画像发生无意义刷新。
 func EngineeringKnowledgeRevision(projectRoot string) (string, error) {
-	paths, err := engineeringKnowledgePaths(projectRoot)
+	paths, err := EngineeringKnowledgePaths(projectRoot)
 	if err != nil {
 		return "", err
 	}
@@ -70,7 +70,8 @@ func cleanEngineeringKnowledgePaths(paths []string) ([]string, error) {
 	return out, nil
 }
 
-func engineeringKnowledgePaths(projectRoot string) ([]string, error) {
+// EngineeringKnowledgePaths 返回必须直接读取的权威来源，不由 AI 重写规则。
+func EngineeringKnowledgePaths(projectRoot string) ([]string, error) {
 	var paths []string
 	err := filepath.WalkDir(projectRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -113,6 +114,11 @@ func skipEngineeringKnowledgeDir(path string) bool {
 			return true
 		case ".skills-seed":
 			if index != 0 || (len(parts) > 1 && parts[1] != "rules") {
+				return true
+			}
+		default:
+			// 隐藏的缓存、测试沙箱和生成目录不是当前项目的权威规则范围。
+			if strings.HasPrefix(part, ".") {
 				return true
 			}
 		}

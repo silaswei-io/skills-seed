@@ -24,20 +24,9 @@ These rules come from authoritative project files and must be followed for match
 `forbidden` means do not execute; `describe_only` means explain only; `requires_authorization` permits execution only after explicit authorization in the current user turn; `allowed` still follows the current user instruction and runtime environment. Authoritative rules cannot be relaxed by code or learned references.
 {{end}}
 
-{{if .DevelopmentFocuses}}## Development Focuses
+{{if .HasNavigation}}## Reuse existing capabilities first
 
-Use this table in the order “changed path -> composite request signal -> primary reference -> source evidence”. Select one primary focus by changed path first, then use resource, action, state, actor, policy, or external-system terms from the request. A generic verb or technical term alone cannot select a focus; when several focuses match, prefer path ownership and report the boundary when it remains ambiguous. A focus is navigation only; source evidence and applicability boundaries remain in the target reference.
-
-| Focus | Request terms | Primary reference | Representative evidence |
-|---|---|---|---|
-{{range .DevelopmentFocuses}}| {{.Title}} | {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}} | [open focus]({{.ReferencePath}}) | {{if .PrimaryPath}}`{{.PrimaryPath}}`{{else}}Confirm from the focus reference{{end}} |
-{{end}}
-{{end}}
-
-{{if .DevelopmentFocuses}}### Focus Boundary Notes
-
-{{range .DevelopmentFocuses}}{{if or .ScopeReason .Attributes .RiskSignals}}- **{{.Title}}**{{if .ScopeReason}}: {{.ScopeReason}}{{end}}{{if .Attributes}}; attributes: {{range $i, $attribute := .Attributes}}{{if $i}}, {{end}}`{{$attribute}}`{{end}}{{end}}{{if .RiskSignals}}; risk signals: {{range $i, $signal := .RiskSignals}}{{if $i}}, {{end}}`{{$signal}}`{{end}}{{end}}
-{{end}}{{end}}
+Before implementing, read [local code navigation](./references/code-navigation.md), search existing capabilities and inspect their callers, source and tests. Prefer reusing or extending existing code and dependencies. Add a component only after explaining why the candidates cannot meet the requirement. Read applicable project and nested authority files first; a static graph does not establish business rules or command permissions.
 {{end}}
 
 ## Task Routing
@@ -47,13 +36,11 @@ Use this table in the order “changed path -> composite request signal -> prima
 
 {{if .HasKnowledge}}
 1. Read applicable user rules first to confirm editable boundaries and command permissions.
-2. Select one primary focus by changed path; when the path is not decisive, use composite request signals. Open the primary focus reference and representative evidence entry.
-3. Follow another reference only when the primary focus page's "Related References" explicitly indicates a cross-boundary concern; do not load multiple focuses because of overlapping keywords.
-4. Without a focus match, use the resource, action, state, and external-dependency terms in the request to choose from "Reference Entry Points"; open the map/index first, then one relevant detail page instead of loading every pattern.
-{{if .References.BusinessPatterns}}For product/domain requests, start with the [Business Pattern Map](./references/patterns/business.md), then open the matching detail.{{end}}
-5. From the pattern page, check its "Related References" section first, then follow cross-boundary links and return to source code to verify applicability, inputs, outputs, and failure semantics.
-6. For interfaces, messages, derived artifacts, configuration, or generation boundaries, read [Project Spec](./references/project-spec.md) first. Do not infer permission to edit directly or run a generator from existing code.
-{{if .WorkflowReferences}}7. Use only the matching user workflow for testing, deployment, release, or acceptance.{{else}}7. No user-maintained testing, deployment, release, or acceptance workflow is available; confirm validation from the current user instruction.{{end}}
+1. Choose the references below by request and changed path, then open the relevant knowledge entry instead of loading every pattern.
+{{if .References.BusinessPatterns}}   For product/domain work, start with the [Business Pattern Map](./references/patterns/business.md).
+{{end}}1. From the pattern page, check its "Related References" section first, then verify applicability, inputs, outputs and failure semantics in the evidence source.
+1. Read [Project Spec](./references/project-spec.md) first for interfaces, messages, derived artifacts, configuration or generation boundaries. Existing code does not establish editing or execution permission.
+{{if .WorkflowReferences}}1. Follow applicable user workflows for testing, deployment, release and acceptance.{{else}}1. No user-maintained validation workflow is available; follow the current user instruction to establish validation.{{end}}
 {{else}}{{if .WorkflowReferences}}1. Choose the user workflow that best matches the task goal.
 2. Read the workflow document before acting; do not execute from the list summary alone.
 3. When the latest user instruction conflicts with the saved workflow, follow the latest instruction and call out the difference.
@@ -75,17 +62,12 @@ Rules are explicit user-maintained constraints; workflows are user-maintained ta
 
 {{range .WorkflowReferences}}- **[{{.Name}}]({{.Path}})**{{if .Summary}} - {{.Summary}}{{else}}{{if .Description}} - {{.Description}}{{end}}{{end}}{{if .RouteTerms}}; task signals: {{range $i, $term := .RouteTerms}}{{if $i}}, {{end}}`{{$term}}`{{end}}{{end}}
 {{end}}
-{{end}}{{if .StateSummaries}}
-## State And Boundary Notes
-
-{{range .StateSummaries}}- {{.}}
-{{end}}
 {{end}}
 {{if .HasKnowledge}}
 ## Reference Entry Points
 
 {{if .References.Enabled}}- **[Project Spec](./references/project-spec.md)** - Explicit authoritative rules and synchronization coverage
-- **[Project Overview](./references/project-overview.md)** - Architecture, technology stack, and key modules
+{{if .References.ProjectOverview}}- **[Project Overview](./references/project-overview.md)** - Architecture, technology stack, and key modules{{end}}
 {{else}}*References were omitted from this generation.*
 {{end}}{{if .OverviewReferences}}
 
@@ -109,11 +91,7 @@ Rules are explicit user-maintained constraints; workflows are user-maintained ta
 - [Project Spec](./references/project-spec.md) records explicit authoritative constraints; pattern pages only provide source-backed reuse navigation.
 - Explicit authoritative rules outrank current code and learned references. Current code only corrects a stale source-learned summary; it cannot override or relax authoritative constraints.
 
-{{if .KeyInsights}}### Key Insights
-
-{{range .KeyInsights}}- {{.}}
 {{end}}
-{{end}}{{end}}
 
 {{if includeSkillsSeedGeneratedNotice}}---
 

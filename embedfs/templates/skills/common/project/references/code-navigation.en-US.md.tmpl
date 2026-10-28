@@ -1,0 +1,21 @@
+# Local code navigation
+
+This is the CodeGraph query entry, not business rules or a claim of completed semantic learning. {{.Files}} files are indexed. Directory names locate source; they do not establish business domains.
+
+## Search before implementing
+
+{{if .HasBusinessMethods}}Browse [reviewed capability contracts](./business-methods.md) as needed; query CodeGraph directly for other symbols.{{end}}
+
+1. Read applicable project and nested `AGENTS.md` files, explicit rules and user instructions to establish edit and command boundaries.
+2. Search by capability, type or interface using `skills-seed codegraph query "keywords"`. Queries incrementally refresh the local index without AI. If CodeGraph is unavailable, search current source symbols and their call sites directly.
+3. Use the returned symbol IDs with `skills-seed codegraph callers <id>`, `callees <id>` or `impact <id>`. Read the actual source and tests at the reported locations.
+4. Use `skills-seed codegraph trace <from-id> <to-id>` for static call paths. Dynamic dispatch, reflection, messaging and cross-service boundaries may be incomplete; no path does not prove no business relationship.
+5. Reuse or extend existing implementations and dependencies first. Before adding a component, explain which candidates were checked, why they cannot satisfy the requirement and what boundary the new component needs. A similar name or an empty search is insufficient evidence.
+
+Files without structural coverage: {{.Unindexed}}. Missing index coverage does not imply missing business capabilities; read source when needed. Full structure stays in the local index instead of being copied into this Skill.
+
+{{if .AuthorityPaths}}## Authoritative sources
+
+Read applicable originals before editing. These paths do not extend rules to other projects.
+{{range .AuthorityPaths}}- `{{.}}`
+{{end}}{{end}}

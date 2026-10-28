@@ -3,6 +3,7 @@ package learning
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
@@ -29,7 +30,15 @@ func callWithOptions(
 	conversation agent.Conversation,
 	build func(*agent.PromptInputSession) (map[string]interface{}, error),
 ) (string, agent.Conversation, error) {
+	if agent.CurrentLearningSupplement(ctx) != nil {
+		templateName = "learning-supplement"
+		task.PromptOnly = true
+		conversation = agent.Conversation{}
+	}
 	runner := structuredtask.NewWithResult(rt.PromptRenderer(), func(ctx context.Context, operation, prompt, contract string, runtime agent.RuntimeTask) (structuredtask.Result, error) {
+		if agent.CurrentLearningSupplement(ctx) != nil && len(prompt) > agent.SupplementInputLimit {
+			return structuredtask.Result{}, fmt.Errorf("%s input: %d bytes exceeds %d-byte safety limit: %w", operation, len(prompt), agent.SupplementInputLimit, agent.ErrSupplementUnresolved)
+		}
 		result, err := rt.InvokeStructured(ctx, agent.StructuredInvoke{
 			Operation:      operation,
 			Prompt:         prompt,

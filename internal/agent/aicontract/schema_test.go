@@ -54,22 +54,6 @@ func TestStrictStructuredOutputSchemaRequiresEveryObjectProperty(t *testing.T) {
 	}
 }
 
-func TestStrictStructuredOutputSchemaKeepsOptionalFocusFieldsRepresentable(t *testing.T) {
-	plan := decodeStrictSchema(t, ContractPlanLearningAgenda)
-	focus := mustFindSchemaContainer(t, plan, "attributes")
-	requireRequiredFields(t, focus, "id", "name", "route_terms", "attributes", "risk_signals", "analysis_depth", "entry_paths", "related_paths", "scope_reason")
-
-	attributes, _, ok := findSchemaPropertyWithContainer(plan, "attributes")
-	require.True(t, ok)
-	require.ElementsMatch(t, []string{"array", "null"}, schemaStringList(attributes["type"]))
-	require.Contains(t, attributes["description"], "Return an empty array when no value applies")
-
-	scopeReason, _, ok := findSchemaPropertyWithContainer(plan, "scope_reason")
-	require.True(t, ok)
-	require.ElementsMatch(t, []string{"string", "null"}, schemaStringList(scopeReason["type"]))
-	require.Contains(t, scopeReason["description"], "Return null when no value applies")
-}
-
 func TestStrictStructuredOutputSchemaAllowsNullForOptionalEnums(t *testing.T) {
 	authority := decodeStrictSchema(t, ContractAuthorityExtraction)
 	commandPolicy, container, ok := findSchemaPropertyWithContainer(authority, "command_policy")
@@ -145,7 +129,7 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 
 	changeKind, _, ok := findSchemaPropertyWithContainer(delta, "change_kind")
 	require.True(t, ok)
-	require.ElementsMatch(t, []string{"added", "modified", "deleted"}, schemaStringList(changeKind["enum"]))
+	require.ElementsMatch(t, []string{"present", "deleted"}, schemaStringList(changeKind["enum"]))
 	line, _, ok := findSchemaPropertyWithContainer(delta, "line")
 	require.True(t, ok)
 	require.Equal(t, float64(1), line["minimum"])
@@ -160,13 +144,6 @@ func TestStructuredOutputSchemaEncodesDTOValueConstraints(t *testing.T) {
 	reasonCode, _, ok := findSchemaPropertyWithContainer(normalize, "reason_code")
 	require.True(t, ok)
 	require.Contains(t, schemaStringList(reasonCode["enum"]), "overfiltered_source_backed")
-}
-
-func TestPlanningSchemaKeepsCoverageCompletionDeterministic(t *testing.T) {
-	plan := decodeSchema(t, ContractPlanLearningAgenda)
-	requireRequiredFields(t, plan, "focuses", "reason")
-	require.NotContains(t, schemaStringList(plan["required"]), "skipped_paths")
-	requireRequiredFields(t, mustFindSchemaContainer(t, plan, "id"), "id", "name")
 }
 
 func TestKnowledgeReviewSchemaRequiresOneDecisionShape(t *testing.T) {

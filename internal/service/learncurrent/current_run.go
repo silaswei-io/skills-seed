@@ -2,7 +2,6 @@ package learncurrent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
-	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runtimeclean"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
@@ -32,7 +30,10 @@ type currentFileSelectionPlan struct {
 	SkipReason string
 }
 
-func runLearnCurrentProjectWithOptions(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
+func runSemanticSupplement(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions) (*learnCurrentProjectResult, error) {
+	if opts.semantic && len(opts.focusPaths) == 0 {
+		return nil, fmt.Errorf("%s", i18n.Get("LearnSemanticFocusRequired"))
+	}
 	run := newLearnCurrentProjectRun(ctx, cont, opts)
 	if !run.hasDecisionCheckpoint() {
 		if err := commandutil.RequireAgentAvailable(cont); err != nil {
@@ -100,13 +101,10 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := r.analyzeCodebase(); err != nil {
 		return nil, err
 	}
-	if r.opts.profileMode == learnCurrentProfileAuto && r.profileRefreshRecommended.Needed {
-		r.refreshProfile = true
-	}
 	if err := r.normalizeAndSavePatternsStep(); err != nil {
 		return nil, err
 	}
-	if err := r.saveProfileIfNeeded(); err != nil {
+	if err := r.markProjectionsCommitted(); err != nil {
 		return nil, err
 	}
 
@@ -139,11 +137,8 @@ func (r *learnCurrentProjectRun) runPlanningStage() error {
 	if r.stateSession != nil {
 		// 恢复运行只消费已持久化的候选和议程，禁止重新调用议程规划。
 		r.applyLearningCandidates()
-		developmentFocuses, coverageFocuses := focusKindCounts(r.stateSession.State.Agenda.Focuses)
 		planLabel := i18n.GetWithParams("ProgressLearnCurrentPlanFocusesRestored", map[string]interface{}{
-			"Focuses":            len(r.stateSession.State.Agenda.Focuses),
-			"DevelopmentFocuses": developmentFocuses,
-			"CoverageFocuses":    coverageFocuses,
+			"Focuses": len(r.stateSession.State.Agenda.Focuses),
 		})
 		return r.steps.Run(planLabel, func() error {
 			r.analysisState = r.stateSession.State
@@ -195,19 +190,11 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		if err != nil {
 			return err
 		}
-		profileExists := false
-		if r.cont.ProfileRepo != nil {
-			if profile, getErr := r.cont.ProfileRepo.Get(r.ctx); getErr == nil {
-				r.existingProfile = profile
-				profileExists = true
-			}
+		_, err = analyzer.EngineeringKnowledgeRevision(r.projectRoot)
+		if err != nil {
+			return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentAuthorityRevisionFailed"), err)
 		}
-		authorityRevision, revisionErr := analyzer.EngineeringKnowledgeRevision(r.projectRoot)
-		if revisionErr != nil {
-			return fmt.Errorf("%s: %w", i18n.Get("LearnCurrentAuthorityRevisionFailed"), revisionErr)
-		}
-		r.refreshProfile, err = shouldRefreshProfile(r.opts.profileMode, profileExists, profileAuthorityRevision(r.existingProfile), authorityRevision)
-		return err
+		return nil
 	}); err != nil {
 		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 			"operation", "command.learn_current.prepare_project",
@@ -223,8 +210,6 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		"project_name", r.projectName,
 		"language", r.currentLanguage,
 		"focus_paths", strings.Join(projectpath.Relative(r.projectRoot, r.resolvedFocusPaths), ","),
-		"profile_mode", r.opts.profileMode,
-		"refresh_profile", r.refreshProfile,
 	)
 	if r.opts.showDetailedLogs {
 		logger.Info(i18n.GetWithParams("LearnCurrentInfo", map[string]interface{}{
@@ -234,8 +219,7 @@ func (r *learnCurrentProjectRun) prepareProject() error {
 		}))
 		if len(r.resolvedFocusPaths) > 0 {
 			logger.Info(i18n.GetWithParams("LearnCurrentFocusInfo", map[string]interface{}{
-				"Focus":       strings.Join(projectpath.Relative(r.projectRoot, r.resolvedFocusPaths), ", "),
-				"ProfileMode": r.opts.profileMode,
+				"Focus": strings.Join(projectpath.Relative(r.projectRoot, r.resolvedFocusPaths), ", "),
 			}))
 		}
 	}
@@ -281,6 +265,9 @@ func (r *learnCurrentProjectRun) maybeCleanRuntimeBeforeFreshAnalysis() error {
 		return err
 	}
 	loggingConfig := r.cont.ConfigRepo.GetLoggingConfig()
+	if !loggingConfig.Enabled {
+		return nil
+	}
 	logDir := filepath.Join(r.cont.SeedPath, loggingConfig.LogsPath)
 	return logger.InitWithRetention(logDir, r.stateRepo.Command(), logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles)
 }
@@ -415,78 +402,9 @@ func (r *learnCurrentProjectRun) applyLearningCandidates() {
 
 func (r *learnCurrentProjectRun) finishWithoutChanges() (*learnCurrentProjectResult, error) {
 	recoveredKnowledge := r.stateSession != nil && r.stateSession.State.SourceBaselineCommitComplete()
-	needsProfileRefresh := r.refreshProfile && !r.projectionsCommitted()
-	if r.opts.showDetailedLogs {
-		logger.Info(i18n.Get("LearnCurrentNoFileChanges"))
-	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentPlanFocuses"), func() error { return nil }); err != nil {
+	if err := r.markProjectionsCommitted(); err != nil {
 		return nil, err
 	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentAnalyzeCodebase"), func() error { return nil }); err != nil {
-		return nil, err
-	}
-	if err := r.steps.Run(i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns"), func() error { return nil }); err != nil {
-		return nil, err
-	}
-	profileStartedAt := time.Now()
-	profileStep := i18n.Get("ProgressLearnCurrentSkipProfile")
-	if needsProfileRefresh {
-		profileStep = i18n.Get("ProgressLearnCurrentSaveProfile")
-	}
-	if err := r.steps.Run(profileStep, func() error {
-		var profile *domain.ProjectProfile
-		if needsProfileRefresh {
-			var err error
-			profile, err = r.refreshProjectProfile()
-			if err != nil {
-				return err
-			}
-		} else if r.stateSession == nil {
-			// 无文件变化且不是断点恢复时，已有 Profile 与知识快照仍然有效。
-			// 跳过再次解析符号，避免重学在最后一步触发 CodeGraph 同步。
-			return r.markProjectionsCommitted()
-		} else if r.cont.ProfileRepo != nil {
-			var err error
-			profile, err = r.cont.ProfileRepo.Get(r.ctx)
-			if err != nil && !errors.Is(err, profilestore.ErrProfileNotFound) {
-				return err
-			}
-		}
-		var err error
-		profile, err = r.verifyProjectProfile(r.ctx, profile)
-		if err != nil {
-			return err
-		}
-		if profile != nil && r.cont.ProfileRepo != nil {
-			if err := r.cont.ProfileRepo.Save(r.ctx, profile); err != nil {
-				return err
-			}
-		}
-		return r.markProjectionsCommitted()
-	}); err != nil {
-		logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
-			"operation", "command.learn_current.save_project_profile",
-			"duration", time.Since(profileStartedAt),
-			"error", err,
-		)
-		return nil, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileFailed", map[string]interface{}{"Error": err.Error()}))
-	}
-	if r.opts.showDetailedLogs {
-		if needsProfileRefresh {
-			logger.Info(i18n.Get("LearnCurrentProfileSaved"))
-		} else {
-			logger.Info(i18n.Get("LearnCurrentProfileSkipped"))
-		}
-		logger.Info(i18n.Get("LearnCurrentComplete"))
-	}
-	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
-		"operation", "command.learn_current",
-		"duration", time.Since(r.startedAt),
-		"patterns_count", r.resultPatternCount(),
-		"saved_count", r.savedCount,
-		"retired_count", r.retiredCount,
-		"skipped", true,
-	)
 	if recoveredKnowledge {
 		if err := commandutil.MarkLearned(r.ctx, r.cont); err != nil {
 			return nil, err
@@ -683,24 +601,4 @@ func resolveFocusPaths(projectRoot string, paths []string) ([]string, error) {
 		seen[path] = true
 	}
 	return resolved, nil
-}
-
-func shouldRefreshProfile(mode string, profileExists bool, storedAuthorityRevision, currentAuthorityRevision string) (bool, error) {
-	switch mode {
-	case "", learnCurrentProfileAuto:
-		return !profileExists || storedAuthorityRevision != currentAuthorityRevision, nil
-	case learnCurrentProfileSkip:
-		return false, nil
-	case learnCurrentProfileRefresh:
-		return true, nil
-	default:
-		return false, fmt.Errorf("%s", i18n.GetWithParams("LearnCurrentProfileModeInvalid", map[string]interface{}{"Mode": mode}))
-	}
-}
-
-func profileAuthorityRevision(profile *domain.ProjectProfile) string {
-	if profile == nil {
-		return ""
-	}
-	return strings.TrimSpace(profile.AuthorityRevision)
 }

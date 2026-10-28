@@ -3,6 +3,8 @@ package learncurrent
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -13,7 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
 func (r *learnCurrentProjectRun) analyzeCodebase() error {
@@ -26,14 +27,6 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 		}
 		r.restoreAnalysisCheckpoint()
 		if len(r.plannedFocuses) == 0 {
-			// 仅补审查时也要准备待提交快照，避免文件指纹前进而 diff 基线滞后。
-			if !r.sourceBaselineCommitted() && r.incrementalChanges != nil {
-				var err error
-				r.codebaseRunContext, err = r.buildCodebaseRunContext()
-				if err != nil {
-					return err
-				}
-			}
 			if err := r.reviewRemainingKnowledge(analyzeLabel); err != nil {
 				return err
 			}
@@ -48,9 +41,6 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 			return err
 		}
 		r.codebaseRunContext = runContext
-		if err := r.ensureSharedLearningContext(); err != nil {
-			return err
-		}
 		_, err = r.analyzePlannedFocuses(analyzeLabel, r.analysisState, r.plannedFocuses)
 		if err != nil {
 			return err
@@ -85,8 +75,8 @@ func (r *learnCurrentProjectRun) analyzeCodebase() error {
 func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, state *commandstate.State, plannedFocuses []domain.EvidenceFocus) (int, error) {
 	batches := r.planAnalysisBatches(plannedFocuses)
 	totalFocuses := len(plannedFocuses) + len(r.pendingKnowledgeReviews())
-	parallelism := r.analysisParallelism(totalFocuses)
-	if parallelism <= 1 || len(batches) <= 1 {
+	parallelism := agent.EffectiveParallelism(r.cont.ConfigRepo.GetAgentConfig().Parallelism)
+	if agent.CurrentLearningSupplement(r.ctx) == nil && (parallelism <= 1 || len(batches) <= 1) {
 		r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeBatches", map[string]interface{}{
 			"Focuses":     len(plannedFocuses),
 			"Batches":     len(batches),
@@ -97,12 +87,14 @@ func (r *learnCurrentProjectRun) analyzePlannedFocuses(analyzeLabel string, stat
 	if err != nil {
 		return completedFocuses, err
 	}
-	logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentAnalyzeFocusesSummary", map[string]interface{}{
-		"Completed":   completedFocuses,
-		"Total":       totalFocuses,
-		"Batches":     len(batches),
-		"Parallelism": parallelism,
-	}))
+	if r.opts.showDetailedLogs {
+		logger.InfoAfterProgress(i18n.GetWithParams("LearnCurrentAnalyzeFocusesSummary", map[string]interface{}{
+			"Completed":   completedFocuses,
+			"Total":       totalFocuses,
+			"Batches":     len(batches),
+			"Parallelism": parallelism,
+		}))
+	}
 	return completedFocuses, nil
 }
 
@@ -111,41 +103,67 @@ func (r *learnCurrentProjectRun) buildCodebaseRunContext() (*analyzer.CodebaseRu
 		FocusPaths:       r.effectiveFocusPaths,
 		SelectedFiles:    r.selectedFiles,
 		SelectedFilesSet: true,
-		UseSnapshotDiffs: true,
 	})
 }
 
 func (r *learnCurrentProjectRun) planAnalysisBatches(plannedFocuses []domain.EvidenceFocus) []learnCurrentBatch {
-	batches := make([]learnCurrentBatch, 0, len(plannedFocuses))
-	for index, focus := range plannedFocuses {
-		batches = append(batches, learnCurrentBatch{
-			index:   index,
-			focuses: []indexedEvidenceFocus{{index: index, focus: focus}},
-		})
+	if len(plannedFocuses) == 0 {
+		return nil
 	}
+	batches := make([]learnCurrentBatch, 0, len(plannedFocuses))
+	var current []indexedEvidenceFocus
+	currentWeight := 0
+	flush := func() {
+		if len(current) == 0 {
+			return
+		}
+		batches = append(batches, learnCurrentBatch{index: current[0].index, focuses: current})
+		current = nil
+		currentWeight = 0
+	}
+	for index, focus := range plannedFocuses {
+		indexed := indexedEvidenceFocus{index: index, focus: focus}
+		weight := r.focusEvidenceWeight(focus)
+		if len(current) > 0 && (!evidenceFocusRelated(current[len(current)-1].focus, focus) || currentWeight+weight > supplementSourceLimit) {
+			flush()
+		}
+		current = append(current, indexed)
+		currentWeight += weight
+	}
+	flush()
 	return batches
 }
 
-func (r *learnCurrentProjectRun) analysisParallelism(batchCount int) int {
-	if batchCount <= 0 {
-		return 1
+// focusEvidenceWeight 用源码大小估算批次容量；单个超限焦点仍独立提交，由下层证据校验负责挂起。
+func (r *learnCurrentProjectRun) focusEvidenceWeight(focus domain.EvidenceFocus) int {
+	weight := 0
+	for _, path := range focus.EntryPaths {
+		info, err := os.Stat(filepath.Join(r.projectRoot, filepath.FromSlash(path)))
+		if err == nil {
+			weight += int(info.Size())
+		}
 	}
-	parallelism := workspacediscovery.EffectiveParallelism(domain.ModeProject, r.cont.ConfigRepo.GetAgentConfig().Parallelism, batchCount)
-	if parallelism < 1 {
-		return 1
+	if weight == 0 {
+		weight = 1
 	}
-	if parallelism > batchCount {
-		return batchCount
-	}
-	return parallelism
+	return weight
 }
-func (r *learnCurrentProjectRun) focusProgressParams(state *commandstate.State, focus domain.EvidenceFocus, current, total int) map[string]interface{} {
-	currentFocus, allFocuses := learnCurrentFocusProgress(state, current, total, focus)
-	return map[string]interface{}{
-		"Current": currentFocus,
-		"Total":   allFocuses,
-		"Name":    learnCurrentProgressSubject(focus),
+
+func evidenceFocusRelated(left, right domain.EvidenceFocus) bool {
+	leftPaths := make(map[string]bool, len(left.EntryPaths))
+	leftDirs := make(map[string]bool, len(left.EntryPaths))
+	for _, path := range left.EntryPaths {
+		clean := filepath.Clean(filepath.FromSlash(path))
+		leftPaths[clean] = true
+		leftDirs[filepath.Dir(clean)] = true
 	}
+	for _, path := range right.EntryPaths {
+		clean := filepath.Clean(filepath.FromSlash(path))
+		if leftPaths[clean] || leftDirs[filepath.Dir(clean)] {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel string, state *commandstate.State, batch learnCurrentBatch, showDetails bool) ([]learnCurrentFocusResult, error) {
@@ -160,7 +178,7 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 			results = append(results, learnCurrentFocusResult{index: indexed.index, focus: indexed.focus})
 			continue
 		}
-		params := r.batchFocusProgressParams(state, indexed)
+		params := map[string]interface{}{"Name": learnCurrentProgressSubject(indexed.focus)}
 		progressLabel := learnCurrentProgressDetail(analyzeLabel, "ProgressLearnCurrentAnalyzeFocus", params)
 		if showDetails {
 			progressLabel = r.detail(analyzeLabel, "ProgressLearnCurrentAnalyzeFocus", params)
@@ -181,12 +199,11 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	// 编排层只通过统一 Mode 入口分析；full/delta 结果形状差异在本函数内消化。
 	mode := analyzer.SelectFocusAnalysisMode(r.useDeltaAnalysis())
 	focusOpts := analyzer.AnalyzeCurrentFocusBatchOptions{
-		Mode:              mode,
-		RuntimeLabel:      batchLabel,
-		LearningMode:      r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
-		ChangeProfile:     string(r.changeProfile),
-		RunContext:        r.codebaseRunContext,
-		SharedContextPath: r.sharedLearningContextPath,
+		Mode:          mode,
+		RuntimeLabel:  batchLabel,
+		LearningMode:  r.cont.ConfigRepo.GetCurrentLearningConfig().Mode,
+		ChangeProfile: string(r.changeProfile),
+		RunContext:    r.codebaseRunContext,
 	}
 	var related map[string][]domain.Pattern
 	if mode == analyzer.FocusAnalysisModeDelta {
@@ -257,14 +274,6 @@ func (r *learnCurrentProjectRun) analyzeBatch(ctx context.Context, analyzeLabel 
 	return results, nil
 }
 
-func (r *learnCurrentProjectRun) batchFocusProgressParams(state *commandstate.State, indexed indexedEvidenceFocus) map[string]interface{} {
-	total := indexed.index + 1
-	if state != nil && len(state.Agenda.Focuses) > 0 {
-		total = len(state.Agenda.Focuses)
-	}
-	return r.focusProgressParams(state, indexed.focus, indexed.index+1, total)
-}
-
 func (r *learnCurrentProjectRun) analysisBatchRuntimeLabel(state *commandstate.State, batch learnCurrentBatch) string {
 	index := batch.index
 	if state != nil && len(state.Agenda.Focuses) > 0 && len(batch.focuses) > 0 {
@@ -282,36 +291,6 @@ func (r *learnCurrentProjectRun) analysisBatchRuntimeLabel(state *commandstate.S
 		}
 	}
 	return fmt.Sprintf("batch-%03d", index+1)
-}
-
-func (r *learnCurrentProjectRun) analysisBatchProgressLabel(state *commandstate.State, batch learnCurrentBatch, totalFocuses int) string {
-	runtimeLabel := r.analysisBatchRuntimeLabel(state, batch)
-	if len(batch.focuses) == 0 {
-		return runtimeLabel
-	}
-	first := batch.focuses[0]
-	last := batch.focuses[len(batch.focuses)-1]
-	currentStart, allFocuses := learnCurrentFocusProgress(state, first.index+1, totalFocuses, first.focus)
-	currentEnd, _ := learnCurrentFocusProgress(state, last.index+1, totalFocuses, last.focus)
-	subjects := make([]string, 0, len(batch.focuses))
-	for _, item := range batch.focuses {
-		subjects = append(subjects, shortenRunes(learnCurrentProgressSubject(item.focus), 24))
-	}
-	if currentStart == currentEnd {
-		return i18n.GetWithParams("LearnCurrentParallelActiveSingle", map[string]interface{}{
-			"Batch":   runtimeLabel,
-			"Current": currentStart,
-			"Total":   allFocuses,
-			"Name":    strings.Join(subjects, " / "),
-		})
-	}
-	return i18n.GetWithParams("LearnCurrentParallelActiveRange", map[string]interface{}{
-		"Batch": runtimeLabel,
-		"Start": currentStart,
-		"End":   currentEnd,
-		"Total": allFocuses,
-		"Name":  strings.Join(subjects, " / "),
-	})
 }
 
 func buildAnalyzedFocusResult(focus domain.EvidenceFocus, index int, learnedPatterns []domain.Pattern, refreshRecommend agent.ProfileRefreshRecommendation, conversation agent.Conversation) learnCurrentFocusResult {

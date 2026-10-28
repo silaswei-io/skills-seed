@@ -135,7 +135,6 @@ func selectedResources(seedLayout layout.Layout, scope Scope) []resource {
 		add("child-project-profiles", filepath.Join("store", "documents", "projects"), seedLayout.StoreDocuments("projects"))
 	}
 	if scope.Cache {
-		add("file-snapshots", filepath.Join("cache", "snapshots"), seedLayout.Snapshots())
 		add("command-checkpoints", filepath.Join("cache", "commands"), seedLayout.CommandStates())
 	}
 	if scope.History {

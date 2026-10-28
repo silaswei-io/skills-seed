@@ -17,8 +17,8 @@ const (
 	ContractAuthorityExtraction         = "AuthorityExtractionOutput"
 	ContractAnalyzeCurrentCodebaseBatch = "AnalyzeCurrentCodebaseBatchOutput"
 	ContractAnalyzeCurrentDeltaBatch    = "AnalyzeCurrentDeltaBatchOutput"
-	ContractPlanLearningAgenda          = "PlanLearningAgendaOutput"
 	ContractReviewKnowledge             = "ReviewKnowledgeOutput"
+	ContractSemanticScreen              = "SemanticScreenOutput"
 	ContractNormalizePatterns           = "NormalizePatternsOutput"
 	ContractWorkspaceProfile            = "WorkspaceProfileOutput"
 	ContractWorkspaceSpec               = "WorkspaceSpecOutput"
@@ -32,8 +32,8 @@ var outputTypes = map[string]reflect.Type{
 	ContractAuthorityExtraction:         reflect.TypeOf(AuthorityExtractionOutput{}),
 	ContractAnalyzeCurrentCodebaseBatch: reflect.TypeOf(AnalyzeCurrentCodebaseBatchOutput{}),
 	ContractAnalyzeCurrentDeltaBatch:    reflect.TypeOf(AnalyzeCurrentDeltaBatchOutput{}),
-	ContractPlanLearningAgenda:          reflect.TypeOf(PlanLearningAgendaOutput{}),
 	ContractReviewKnowledge:             reflect.TypeOf(ReviewKnowledgeOutput{}),
+	ContractSemanticScreen:              reflect.TypeOf(SemanticScreenOutput{}),
 	ContractNormalizePatterns:           reflect.TypeOf(NormalizePatternsOutput{}),
 	ContractWorkspaceProfile:            reflect.TypeOf(WorkspaceProfileOutput{}),
 	ContractWorkspaceSpec:               reflect.TypeOf(WorkspaceSpecOutput{}),

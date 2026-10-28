@@ -2,32 +2,20 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
-	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
-	gencmd "github.com/silaswei-io/skills-seed/internal/command/generate"
-	learncmd "github.com/silaswei-io/skills-seed/internal/command/learn"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
-	"github.com/silaswei-io/skills-seed/internal/infra/git"
-	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
-	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
-	statestore "github.com/silaswei-io/skills-seed/internal/infra/storage/state"
-	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
-	"github.com/silaswei-io/skills-seed/internal/service/generator"
-	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	"github.com/silaswei-io/skills-seed/internal/service/navigation"
+	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
-	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
@@ -121,7 +109,7 @@ func TestSyncGeneratedSkillMissing(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, ".agents", "skills", "demo"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, ".agents", "skills", "demo", "SKILL.md"), []byte("# skill\n"), 0644))
 
-	require.False(t, syncGeneratedSkillMissing(cont))
+	require.True(t, syncGeneratedSkillMissing(cont), "entry alone cannot replace the navigation manifest")
 }
 
 func TestSyncGeneratedSkillMissingInWorkspaceChecksChildSkills(t *testing.T) {
@@ -164,176 +152,6 @@ func TestSyncGeneratedSkillMissingInWorkspaceChecksChildSkills(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(childRoot, ".agents", "skills", "backend-dev", "SKILL.md"), []byte("# backend\n"), 0644))
 
 	require.False(t, syncGeneratedSkillMissing(cont))
-}
-
-func TestSyncLearnUsesSyncScopedCommandState(t *testing.T) {
-	userContext := "sync context"
-	projectRoot := t.TempDir()
-	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Name = "demo"
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Project.RootPath = projectRoot
-	cfg.Project.Language = "go"
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Skills.Target = "codex"
-	cfg.Skills.Locale = "zh-CN"
-	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
-	require.NoError(t, configRepo.Update(cfg))
-	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())
-	require.NoError(t, os.MkdirAll(filepath.Join(projectRoot, "internal"), 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "internal", "key.go"), []byte("package internal\n"), 0644))
-	require.NoError(t, exec.Command("git", "-C", projectRoot, "add", "-A").Run())
-
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
-	require.NoError(t, err)
-	defer patternRepo.Close()
-	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
-	gitRepo := git.NewRepository(projectRoot)
-	patternNormSvc := patternnorm.NewService(patternRepo)
-	cont := &container.Container{
-		SeedPath:       seedPath,
-		Config:         configRepo.Get(),
-		ConfigRepo:     configRepo,
-		GitRepo:        gitRepo,
-		PatternRepo:    patternRepo,
-		FileTracker:    patternRepo,
-		ProfileRepo:    profilestore.NewRepository(seedPath),
-		Agent:          mockAgent,
-		AnalyzerSvc:    analyzer.NewAnalyzerService(mockAgent, configRepo),
-		PatternNormSvc: patternNormSvc,
-	}
-	staleLearnState := commandstate.NewState("learn-current", "demo", "go", userContext, []domain.FileAnalysisRecord{
-		{Path: "internal/stale.go", Hash: "stale"},
-	}, nil, []domain.EvidenceFocus{{ID: "stale", EntryPaths: []string{"internal/stale.go"}}})
-	require.NoError(t, commandstate.NewRepository(seedPath, "learn-current").Save(context.Background(), staleLearnState))
-
-	planCalls := 0
-	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-		planCalls++
-		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
-			{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}},
-		}}, nil
-	}
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		return nil, errors.New("stop before state is cleared")
-	}
-	stateScope := commandutil.CommandStateScope("sync")
-
-	_, err = syncLearn(context.Background(), cont, stateScope, userContext, syncRunAuto, nil, commandDependenciesForTest())
-
-	require.Error(t, err)
-	require.Equal(t, 1, planCalls)
-	syncStateBytes, readErr := os.ReadFile(commandstate.NewRepository(seedPath, stateScope).Path())
-	require.NoError(t, readErr)
-	var syncState commandstate.State
-	require.NoError(t, json.Unmarshal(syncStateBytes, &syncState))
-	require.Equal(t, "sync", syncState.Command)
-	require.Equal(t, []domain.EvidenceFocus{{ID: "key", Name: "Key", EntryPaths: []string{"internal/key.go"}}}, syncState.Agenda.Focuses)
-	require.FileExists(t, commandstate.NewRepository(seedPath, "learn-current").Path())
-}
-
-func TestSyncRestartForcesCurrentLearning(t *testing.T) {
-	projectRoot := t.TempDir()
-	seedPath := filepath.Join(projectRoot, ".skills-seed")
-	configRepo, err := config.NewRepository(seedPath, "zh-CN")
-	require.NoError(t, err)
-	cfg := configRepo.Get()
-	cfg.Project.Name = "demo"
-	cfg.Project.Mode = domain.ModeProject
-	cfg.Project.RootPath = projectRoot
-	cfg.Project.Language = "go"
-	cfg.Agent.Engine = "mock"
-	cfg.Agent.Commands = map[string]string{"mock": "mock"}
-	cfg.Skills.Target = "codex"
-	cfg.Skills.Locale = "zh-CN"
-	cfg.Skills.Paths = map[string]string{"codex": filepath.Join(".agents", "skills", "demo-dev")}
-	require.NoError(t, configRepo.Update(cfg))
-	require.NoError(t, exec.Command("git", "-C", projectRoot, "init", "-q").Run())
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "main.go"), []byte("package main\nfunc main() {}\n"), 0644))
-	require.NoError(t, exec.Command("git", "-C", projectRoot, "add", "-A").Run())
-
-	patternRepo, err := boltdb.NewPatternRepository(filepath.Join(seedPath, "store", "project.db"))
-	require.NoError(t, err)
-	defer patternRepo.Close()
-	record := domain.FileAnalysisRecord{
-		Path:           "main.go",
-		Hash:           "a071a7bc9d4fd44b32558cc706a5a698",
-		HashAlgorithm:  domain.FileAnalysisHashMD5,
-		Source:         domain.FileAnalysisSourceCurrentCode,
-		AnalysisStatus: domain.FileAnalysisStatusAnalyzed,
-		LastAnalyzedAt: "2026-01-01T00:00:00Z",
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
-	}
-	require.NoError(t, patternRepo.SaveAnalyzedFiles(context.Background(), []domain.FileAnalysisRecord{record}))
-
-	planCalls := 0
-	mockAgent := &mocks.MockAgent{NameVal: "mock", AvailableVal: true}
-	mockAgent.PlanLearningAgendaFn = func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-		planCalls++
-		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{{ID: "main", Name: "Main", EntryPaths: []string{"main.go"}}}}, nil
-	}
-	mockAgent.AnalyzeCurrentCodebaseFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
-		pattern := domain.NewPattern("sync-restart-pattern", "Restart Pattern", domain.CategoryBusiness)
-		pattern.Confidence = 0.9
-		pattern.SetDescription("description")
-		pattern.SetRule("rule")
-		pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "main.go", Line: 2, Symbol: "main", Kind: "func"}}
-		return &agent.AnalyzeCurrentCodebaseResult{Patterns: []domain.Pattern{*pattern}}, nil
-	}
-
-	profileRepo := profilestore.NewRepository(seedPath)
-	require.NoError(t, profileRepo.Save(context.Background(), &domain.ProjectProfile{
-		ProjectName: "demo",
-		Language:    "go",
-		Summary:     "profile",
-		GeneratedAt: "2026-01-01 00:00:00",
-	}))
-	patternNormSvc := patternnorm.NewService(patternRepo)
-	cont := &container.Container{
-		SeedPath:       seedPath,
-		Config:         configRepo.Get(),
-		ConfigRepo:     configRepo,
-		GitRepo:        git.NewRepository(projectRoot),
-		PatternRepo:    patternRepo,
-		FileTracker:    patternRepo,
-		ProfileRepo:    profileRepo,
-		StateRepo:      statestore.NewRepository(seedPath),
-		Agent:          mockAgent,
-		AnalyzerSvc:    analyzer.NewAnalyzerService(mockAgent, configRepo),
-		PatternNormSvc: patternNormSvc,
-		GeneratorSvc:   generator.NewGeneratorService(patternRepo, profileRepo, skills.NewLoaderForAgent("codex", "zh-CN"), configRepo, nil, nil),
-	}
-
-	_, err = syncLearn(context.Background(), cont, commandutil.CommandStateScope("sync"), "", syncRunRestart, nil, commandDependenciesForTest())
-
-	require.NoError(t, err)
-	require.Equal(t, 1, planCalls)
-	require.FileExists(t, filepath.Join(projectRoot, ".agents", "skills", "demo-dev", "SKILL.md"))
-}
-
-func commandDependenciesForTest() Dependencies {
-	return Dependencies{
-		LearnCurrent: func(ctx context.Context, cont *container.Container, req syncflow.LearnCurrentRequest, opts LearnCurrentOptions) (domain.LearnCurrentResult, error) {
-			return learncmd.RunLearnCurrentWithStateScopeOptions(ctx, cont, req.StateScope, req.UserContext, learncmd.CurrentRunOptions{
-				Force:          req.Force,
-				Quiet:          opts.Quiet,
-				OnStepStart:    opts.OnStepStart,
-				OnStepUpdate:   opts.OnStepUpdate,
-				OnStepComplete: opts.OnStepComplete,
-			})
-		},
-		Generate: gencmd.RunGenerate,
-		GenerateChild: func(cont *container.Container, _ GenerateChildOptions) error {
-			return gencmd.RunGenerateQuiet(cont)
-		},
-		LearnWorkspaceRelationships: learncmd.RunWorkspaceRelationships,
-		GenerateWorkspaceRoot:       gencmd.RunGenerateWorkspaceRoot,
-	}
 }
 
 func TestSyncWorkspaceLearnGeneratesChildBeforeWorkspaceRoot(t *testing.T) {
@@ -509,6 +327,25 @@ func TestHasSyncCommandStateForTargetFindsWorkspaceChildState(t *testing.T) {
 	require.True(t, resumable)
 }
 
+func TestSyncResumeRecognizesPendingLocalSupplement(t *testing.T) {
+	seedPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "runtime"), 0700))
+	statusPath := filepath.Join(seedPath, "runtime", "local-supplement.json")
+	require.NoError(t, os.WriteFile(statusPath, []byte(`{"pending":[{"path":"domain/flow.go"}]}`), 0600))
+	cont := &container.Container{SeedPath: seedPath}
+	hasState, err := hasSyncCommandStateForTarget(context.Background(), cont, "sync")
+	require.NoError(t, err)
+	require.True(t, hasState)
+	resumable, err := hasResumableSyncCommandStateForTarget(context.Background(), cont, "sync")
+	require.NoError(t, err)
+	require.True(t, resumable)
+
+	require.NoError(t, os.WriteFile(statusPath, []byte(`{"pending":[]}`), 0600))
+	resumable, err = hasResumableSyncCommandStateForTarget(context.Background(), cont, "sync")
+	require.NoError(t, err)
+	require.False(t, resumable)
+}
+
 func TestClearSyncCommandStatesClearsWorkspaceChildState(t *testing.T) {
 	ctx := context.Background()
 	workspaceRoot := t.TempDir()
@@ -660,4 +497,32 @@ func TestSyncRestartClearsOnlySyncCommandState(t *testing.T) {
 	require.ErrorIs(t, err, commandstate.ErrStateNotFound)
 	_, err = learnRepo.Load(context.Background())
 	require.NoError(t, err)
+}
+
+func TestLocalScanCannotConsumePendingGeneration(t *testing.T) {
+	root := t.TempDir()
+	seed := filepath.Join(root, ".skills-seed")
+	cfg, err := config.NewRepository(seed, "en-US")
+	require.NoError(t, err)
+	value := cfg.Get()
+	value.Project.RootPath = root
+	value.Skills.Target = "codex"
+	value.Skills.Paths = map[string]string{"codex": ".agents/skills/demo"}
+	require.NoError(t, cfg.Update(value))
+	cont := &container.Container{SeedPath: seed, ConfigRepo: cfg}
+	navPath := navigation.SnapshotPath(root)
+	require.NoError(t, os.MkdirAll(filepath.Dir(navPath), 0700))
+	require.NoError(t, os.WriteFile(navPath, []byte("old graph"), 0600))
+	hash, err := navigation.Hash(root)
+	require.NoError(t, err)
+	output := filepath.Join(root, ".agents/skills/demo")
+	require.NoError(t, os.MkdirAll(output, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(output, "SKILL.md"), []byte("skill"), 0600))
+	manifestPath := skilloutput.RuntimeManifestPath(seed, "codex")
+	require.NoError(t, os.MkdirAll(filepath.Dir(manifestPath), 0700))
+	require.NoError(t, skilloutput.WriteManifest(output, manifestPath, skilloutput.Manifest{NavigationHash: hash}))
+	require.False(t, syncGeneratedSkillMissing(cont))
+	// 查询预先更新了导航快照，后续无源码变化的 sync 仍须补生成。
+	require.NoError(t, os.WriteFile(navPath, []byte("new graph from query"), 0600))
+	require.True(t, syncGeneratedSkillMissing(cont))
 }

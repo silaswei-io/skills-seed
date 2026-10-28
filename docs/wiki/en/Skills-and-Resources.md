@@ -1,5 +1,7 @@
 # Skills and Resources
 
+By default, `sync` / `learn current` scan locally with bundled CodeGraph, then select important semantic gaps using changed knowledge evidence and local call relationships. Candidates are dynamically batched by priority and evidence capacity, with independent review and checkpoints. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](Learning-and-Sync.md).
+
 > **Use this page when:** you need to understand the generated layout, review an entry Skill, or distinguish references, rules, and workflows.
 
 ## Responsibility of Generated Output
@@ -17,24 +19,31 @@ Typical layout:
 │   ├── project-spec.md
 │   ├── modules.md
 │   ├── business-methods.md
+│   ├── business-methods/        # One detail per capability entry
+│   ├── code-navigation.md       # CodeGraph query entry
 │   └── patterns/
+│       ├── business.md          # Business rule index
+│       ├── business/groups/      # Responsibility-theme indexes from reviewed titles
+│       └── business/items/      # One detail per business rule
 ├── rules/
 └── workflows/
 ```
 
 The actual layout changes with project mode, target Agent, learned knowledge, and user resources.
 
+The business map and capability index only route requests. Reviewed rules with a shared responsibility theme get a small index derived from their titles; each rule keeps its own detail and evidence, while standalone rules link directly from the map. CodeGraph structure stays in `.codegraph` instead of being copied into Skill pages. `code-navigation.md` explains local queries. Entries independently reviewed by AI and matched to local symbol facts appear in `business-methods.md` with task applicability, prerequisites and result or failure semantics. An Agent loads only the relevant content.
+
 ## What the Entry Skill Should Answer
 
 `SKILL.md` must help an Agent decide before editing:
 
-1. Which project, module, or development focus owns the task?
+1. Which project, module, or reviewed business responsibility owns the task?
 2. Does an explicit Rule or Workflow constrain the task first?
 3. Which project references, capability entries, and source locations must be read?
-4. When several focuses match, how should the primary focus be selected and when should related references be expanded?
+4. When several business patterns apply, which responsibility does the evidence establish and when should related references be read?
 5. Which impact boundaries or unknowns must be confirmed before implementation?
 
-After a focus matches, read the primary focus reference and representative evidence entry first; follow another reference only when the target page explicitly identifies a cross-boundary relationship. A generic verb or technical term alone cannot select a focus. Focus summaries, attributes, and risk signals explain boundaries but do not replace source verification.
+After a business pattern matches, read only its detail and evidence entry; follow another reference when the target page explicitly identifies a cross-boundary relationship. A generic verb or technical term alone cannot establish ownership, and current source remains the final check.
 
 Rule and Workflow `summary` and `route_terms` are also entry-navigation metadata only; explicit scopes and the complete resource text still define boundaries and permissions.
 
@@ -56,7 +65,7 @@ Review against real development decisions:
 
 - Does the entry trigger for implementation, diagnosis, contracts, configuration, boundaries, and verification work?
 - Do mandatory constraints come from the correct authority and remain above source observations?
-- Do development focuses have natural names, stable route terms, and multi-match disambiguation where needed?
+- Do reviewed business patterns have natural responsibility names, evidence entries, and clear applicability boundaries?
 - Do capability entries include a declaration, prerequisites, result semantics, and locatable source?
 - Does the module map describe real responsibility and dependencies rather than self-dependencies or guessed paths?
 - Does output contain only valid projections with working plans and links?

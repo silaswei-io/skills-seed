@@ -17,6 +17,7 @@ import (
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	workflowstore "github.com/silaswei-io/skills-seed/internal/infra/storage/workflow"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +38,7 @@ func newGeneratorService(
 	loader *skills.Loader,
 	cfg config.Reader,
 ) *GeneratorService {
-	return NewGeneratorService(patternRepo, profileRepo, loader, cfg, nil, nil)
+	return NewGeneratorService(patternRepo, nil, profileRepo, loader, cfg, nil, nil)
 }
 
 func TestGenerateSkills_NoPatterns(t *testing.T) {
@@ -107,14 +108,11 @@ func TestGenerateSkillsProjectsAuthoritativeCommandPolicyAndCoverage(t *testing.
 	outputPath := filepath.Join(root, ".agents", "skills", "demo-dev")
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), outputPath))
-	skill := readGeneratedFile(t, outputPath, "SKILL.md")
-	spec := readGeneratedFile(t, outputPath, "references", "project-spec.md")
-	require.Contains(t, skill, "Command execution")
-	require.Contains(t, skill, domain.CommandPolicyRequiresAuthorization)
+	nav := readGeneratedFile(t, outputPath, "references", "code-navigation.md")
+	require.Contains(t, nav, "AGENTS.md")
+	require.Contains(t, nav, "直接阅读")
 	require.NoFileExists(t, filepath.Join(outputPath, "references", "validation.md"))
-	require.NoFileExists(t, filepath.Join(outputPath, "references", "testing.md"))
-	require.Contains(t, spec, "AGENTS.md")
-	require.Contains(t, spec, "Commands")
+
 }
 
 func TestGenerateSkillsBuildsProjectSpecFromCurrentPatterns(t *testing.T) {
@@ -207,7 +205,7 @@ func TestGenerateSkillsResourceOnlySkipsEmptyKnowledgeTemplates(t *testing.T) {
 		Name:    "部署到195测试环境",
 		Content: "# 部署到195测试环境\n\n## 适用场景\n部署 cipher_machine 到 195 测试环境。\n",
 	}))
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(mockPattern, nil, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "hsmwebapi", Language: "go"},
 	}, workflowRepo, nil)
 	outputPath := t.TempDir()
@@ -300,6 +298,9 @@ func TestGenerateSkillsExcludesCacheKnowledgeFromRenderedReferences(t *testing.T
 	current.SetDescription("The application service owns the runnable project flow.")
 	current.SetRule("Inspect the current application entry before changing the run flow.")
 	current.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/app/service.go", Kind: "file"}}
+	hash, err := sourcecode.EvidenceDigest(root, "internal/app/service.go")
+	require.NoError(t, err)
+	current.EvidenceLocations[0].ContentHash = hash
 	cached := domain.NewPattern("cache-run", "Cached Run", domain.CategoryBusiness)
 	cached.Confidence = 0.9
 	cached.SetDescription("Cached dependency behavior.")
@@ -334,12 +335,12 @@ func TestGenerateSkillsExcludesCacheKnowledgeFromRenderedReferences(t *testing.T
 
 	for _, path := range []string{
 		"SKILL.md",
-		"references/project-overview.md",
 		"references/project-spec.md",
 		"references/patterns/business.md",
 	} {
 		assert.NotContains(t, readGeneratedFile(t, outputPath, strings.Split(path, "/")...), ".test/quality/cache")
 	}
+	require.NoFileExists(t, filepath.Join(outputPath, "references/project-overview.md"))
 	assertNoBrokenMarkdownLinks(t, outputPath)
 }
 

@@ -1,5 +1,7 @@
 # Workspace
 
+By default, `sync` / `learn current` scan locally with bundled CodeGraph, then select important semantic gaps using changed knowledge evidence and local call relationships. Candidates are dynamically batched by priority and evidence capacity, with independent review and checkpoints. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](Learning-and-Sync.md).
+
 Workspace mode is for a root directory containing multiple independent Git projects. It preserves ownership rather than merging all code into one project: children learn their own source, while the root routes work, captures shared constraints, and describes cross-project impact.
 
 > **Use this page when:** your root contains independent Git child projects and requests need ownership or cross-project impact judgment first.
@@ -42,7 +44,7 @@ A root Rule does not automatically become every child's Rule. Resource ownership
 ## Runtime Strategy
 
 - Root `agent.parallelism` caps both child-project concurrency and total Agent calls shared across children.
-- Each child config controls focus scheduling without enlarging the root budget. Source analysis and review share slots; knowledge-review calls remain serial across children.
+- Each child config controls focus scheduling without enlarging the root budget. Source analysis and independent review share slots; reviews in different children may overlap, while checkpoints for one project are committed serially.
 - Cross-project work routes from the root Skill to affected child Skills and source.
 - Resumption should reuse plans and checkpoints instead of rescanning unchanged children.
 

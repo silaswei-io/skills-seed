@@ -32,8 +32,6 @@ type learnProjectCtx struct {
 	currentLanguage    string
 	learningMode       string
 	resolvedFocusPaths []string
-	refreshProfile     bool
-	existingProfile    *domain.ProjectProfile
 }
 
 // learnChangeCtx 描述增量候选与恢复状态。
@@ -51,10 +49,9 @@ type learnChangeCtx struct {
 
 // learnAgendaCtx 描述议程与分析运行态。
 type learnAgendaCtx struct {
-	analysisState             *commandstate.State
-	plannedFocuses            []domain.EvidenceFocus
-	codebaseRunContext        *analyzer.CodebaseRunContext
-	sharedLearningContextPath string
+	analysisState      *commandstate.State
+	plannedFocuses     []domain.EvidenceFocus
+	codebaseRunContext *analyzer.CodebaseRunContext
 	// conversations 仅在当前进程内保存焦点会话，检查点不会持久化模型会话标识。
 	conversations map[string]agent.Conversation
 }

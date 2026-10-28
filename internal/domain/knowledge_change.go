@@ -31,7 +31,7 @@ const (
 )
 
 // KnowledgeChange 是 learn current 增量分析的过程产物。
-// 它描述 diff 对知识库造成的变化，后续再由协调层转换成模式入库候选。
+// 它描述当前源码对知识库造成的变化，后续再由协调层转换成模式入库候选。
 type KnowledgeChange struct {
 	FocusAction   KnowledgeFocusAction
 	FocusID       string

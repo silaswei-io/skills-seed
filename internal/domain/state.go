@@ -11,18 +11,20 @@ type RuntimeState struct {
 
 // LearnCurrentSummary 描述 learn current 的用户可读运行摘要。
 type LearnCurrentSummary struct {
-	ChangedFiles     int
-	DeletedFiles     int
-	SkippedFiles     int
-	PatternsFound    int
-	PatternsSaved    int
-	PatternsRetired  int
-	PatternsDropped  int
-	DropReasons      []string
-	Projects         int
-	ChangedProjects  int
-	WorkspaceChanged bool
-	NoFileChanges    bool
+	NavigationUpdated bool // 本地导航变化不表示业务语义已学习。
+	PendingFiles      int  // 本地候选中尚未完成语义判断的文件数，不等于已确认存在的业务问题数。
+	ChangedFiles      int
+	DeletedFiles      int
+	SkippedFiles      int
+	PatternsFound     int
+	PatternsSaved     int
+	PatternsRetired   int
+	PatternsDropped   int
+	DropReasons       []string
+	Projects          int
+	ChangedProjects   int
+	WorkspaceChanged  bool
+	NoFileChanges     bool
 }
 
 // LearnCurrentResult 描述 learn current 的运行结果。

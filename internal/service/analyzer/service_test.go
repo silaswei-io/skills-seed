@@ -3,7 +3,6 @@ package analyzer
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +31,23 @@ func TestGetProjectStructure(t *testing.T) {
 	assert.Contains(t, structure, "cmd")
 	assert.Contains(t, structure, "internal")
 	assert.Contains(t, structure, "main.go")
+}
+
+func TestBuildCodebaseRunContextUsesCurrentFilesWithoutSourceSnapshots(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "internal", "service.go")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("package internal\nfunc Run() {}\n"), 0o644))
+	svc := NewAnalyzerService(nil, &mocks.MockConfigReader{})
+	run, err := svc.BuildCodebaseRunContext(context.Background(), root, "go", AnalyzeCodebaseOptions{
+		FocusPaths:       []string{path},
+		SelectedFiles:    []domain.FileInfo{{Path: "internal/service.go"}},
+		SelectedFilesSet: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []agent.SampleFile{{Path: "internal/service.go"}}, run.SampleFiles)
+	require.NoDirExists(t, filepath.Join(root, ".skills-seed", "cache", "snapshots"))
+	require.NoDirExists(t, filepath.Join(root, ".skills-seed", "runtime", "diffs"))
 }
 
 func TestGetProjectStructureUsesConfiguredExclude(t *testing.T) {
@@ -113,43 +129,6 @@ func TestAnalyzeProjectProfileUsesAgent(t *testing.T) {
 	require.True(t, session.called)
 	assert.Equal(t, "go", result.Language)
 	assert.Equal(t, "session profile", result.Summary)
-}
-
-func TestAnalyzeProjectProfileAddsStructuralContext(t *testing.T) {
-	tmpDir := t.TempDir()
-	var received agent.AnalyzeProjectRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-	}
-	session := &profileRefreshTestSession{
-		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-			received = *req
-			return &agent.AnalyzeProjectResult{Language: "go"}, nil
-		},
-	}
-	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled: true,
-				},
-			},
-		},
-	})
-	svc.structuralCollector = fakeStructuralCollector{
-		context: "## Structural Context\n- main calls service",
-	}
-
-	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		MainFiles:   []string{"main.go"},
-	})
-
-	require.NoError(t, err)
-	require.Contains(t, received.StructuralContext, "main calls service")
 }
 
 func TestAnalyzeProjectProfileCollectsEngineeringKnowledgeOutsideFocus(t *testing.T) {
@@ -242,79 +221,6 @@ func TestAnalyzeProjectProfileUsesIndependentlyReviewedAuthority(t *testing.T) {
 	}}, result.EngineeringRules)
 }
 
-func TestAnalyzeProjectProfileSkipsStructuralContextWithoutSeeds(t *testing.T) {
-	tmpDir := t.TempDir()
-	var received agent.AnalyzeProjectRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-	}
-	session := &profileRefreshTestSession{
-		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-			received = *req
-			return &agent.AnalyzeProjectResult{Language: "go"}, nil
-		},
-	}
-	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled: true,
-				},
-			},
-		},
-	})
-	svc.structuralCollector = fakeStructuralCollector{
-		context: "## Structural Context\n- should not be used",
-	}
-
-	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-	})
-
-	require.NoError(t, err)
-	require.Empty(t, received.StructuralContext)
-}
-
-func TestAnalyzeProjectProfileSkipsUnavailableOptionalStructuralContext(t *testing.T) {
-	tmpDir := t.TempDir()
-	var received agent.AnalyzeProjectRequest
-	mockAgent := &mocks.MockAgent{
-		NameVal: "test", AvailableVal: true,
-	}
-	session := &profileRefreshTestSession{
-		fn: func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error) {
-			received = *req
-			return &agent.AnalyzeProjectResult{Language: "go"}, nil
-		},
-	}
-	mockAgent.RefreshProjectProfileFn = session.RefreshProjectProfile
-	svc := NewAnalyzerService(mockAgent, &mocks.MockConfigReader{
-		LearningCfg: config.LearningConfig{
-			Current: config.CurrentLearningConfig{
-				Structural: config.StructuralConfig{
-					Enabled: true,
-				},
-			},
-		},
-	})
-	svc.structuralCollector = fakeStructuralCollector{
-		err: errors.New("unavailable"),
-	}
-
-	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{
-		ProjectName: "test",
-		RootPath:    tmpDir,
-		Language:    "go",
-		MainFiles:   []string{"main.go"},
-	})
-
-	require.NoError(t, err)
-	require.Empty(t, received.StructuralContext)
-}
-
 func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	mockAgent := &mocks.MockAgent{
 		NameVal: "test", AvailableVal: true,
@@ -328,64 +234,6 @@ func TestAnalyzeProjectProfile_AIError(t *testing.T) {
 	svc := NewAnalyzerService(mockAgent, nil)
 	_, err := svc.analyzeProjectProfile(context.Background(), &AnalyzeProjectRequest{})
 	assert.Error(t, err)
-}
-
-func TestPlanningSourceFactsExposeDensityAndBoundSymbolPreview(t *testing.T) {
-	root := t.TempDir()
-	maxSymbols := 4
-	var source strings.Builder
-	source.WriteString("package sample\n\n")
-	for index := 0; index < maxSymbols+3; index++ {
-		fmt.Fprintf(&source, "func Operation%d() {}\n", index)
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(root, "service.go"), []byte(source.String()), 0o644))
-
-	facts := planningSourceFacts(context.Background(), root, []string{"service.go"}, maxSymbols)
-
-	require.Len(t, facts, 1)
-	require.Equal(t, "service.go", facts[0].Path)
-	require.Equal(t, maxSymbols+3, facts[0].SymbolCount)
-	require.Len(t, facts[0].Symbols, maxSymbols)
-	require.Greater(t, facts[0].NonBlankLines, maxSymbols)
-}
-
-func TestPlanningSourceFactsSharesConfiguredSymbolBudgetAcrossFiles(t *testing.T) {
-	root := t.TempDir()
-	for _, name := range []string{"first.go", "second.go"} {
-		source := "package sample\n\nfunc First() {}\nfunc Second() {}\nfunc Third() {}\n"
-		require.NoError(t, os.WriteFile(filepath.Join(root, name), []byte(source), 0o644))
-	}
-
-	facts := planningSourceFacts(context.Background(), root, []string{"second.go", "first.go"}, 4)
-
-	require.Len(t, facts, 2)
-	require.Len(t, facts[0].Symbols, 2)
-	require.Len(t, facts[1].Symbols, 2)
-	require.Equal(t, 3, facts[0].SymbolCount)
-	require.Equal(t, 3, facts[1].SymbolCount)
-}
-
-func TestTreeSitterCollectorMaxFileSizeUsesKilobytes(t *testing.T) {
-	projectRoot := t.TempDir()
-	smallSource := "package main\n\nfunc Small() {}\n"
-	largeSource := "package main\n\n" + strings.Repeat("// padding\n", 140) + "\nfunc Large() {}\n"
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "small.go"), []byte(smallSource), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(projectRoot, "large.go"), []byte(largeSource), 0644))
-
-	collector := newStructuralCollector(config.StructuralConfig{
-		Enabled:     true,
-		Provider:    config.StructuralProviderTreeSitter,
-		MaxSymbols:  10,
-		MaxFileSize: 1,
-	})
-
-	result, err := collector.Collect(context.Background(), projectRoot, structuralContextRequest{
-		SeedPaths: []string{"small.go", "large.go"},
-	})
-
-	require.NoError(t, err)
-	require.Contains(t, result, "Small")
-	require.NotContains(t, result, "Large")
 }
 
 func TestCollectSampleFiles(t *testing.T) {
@@ -635,11 +483,6 @@ func TestBuildProjectProfileResult_PassesRuntimeUserContext(t *testing.T) {
 	assert.Equal(t, "user_context", received.AuthoritySections[0].Source)
 }
 
-type fakeStructuralCollector struct {
-	context string
-	err     error
-}
-
 type profileRefreshTestSession struct {
 	called      bool
 	result      *agent.AnalyzeProjectResult
@@ -664,8 +507,4 @@ func (s *profileRefreshTestSession) ExtractAuthority(ctx context.Context, req *a
 		sections = append(sections, agent.AuthoritySectionResult{SectionID: section.ID, NoRuleReason: "No explicit project constraint was found."})
 	}
 	return &agent.ExtractAuthorityResult{AuthoritySections: sections}, nil
-}
-
-func (f fakeStructuralCollector) Collect(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
-	return f.context, f.err
 }

@@ -1,5 +1,7 @@
 # Sync
 
+Default learning scans locally with bundled CodeGraph, groups candidates along real call paths, then analyzes and independently reviews remaining semantic gaps in dynamic evidence batches. Pending gaps and failure reasons are recorded in `.skills-seed/runtime/local-supplement.json`; a normal `sync` retries unfinished stages. Use `learn current --semantic --focus <path>` for explicit deeper analysis. Query existing capabilities with `skills-seed codegraph query`, then inspect callers/callees/impact/trace before creating a new implementation. Structural navigation is not proof of complete business understanding.
+
 Use `skills-seed sync` for the normal day-to-day loop: learn current repository changes and regenerate Skills when needed.
 
 ## Purpose

@@ -783,10 +783,10 @@ other = "skills-seed 未初始化"
 other = "请先运行 'skills-seed init' 初始化项目"
 
 [LearnLongDesc]
-other = "从当前代码库学习编码模式。\n\n此命令将：\n  • 使用独立 AI runtime 调用规划和分析\n  • 分析当前代码或 diff 锚定变更\n  • 提取有源码证据的编码模式\n  • 规范化保存学到的 patterns 到数据库\n  • 为生成 skills 准备可收敛的项目知识"
+other = "从当前代码库学习可复用业务知识。\n\n此命令将：\n  • 使用本地 CodeGraph 扫描文件、符号和调用关系\n  • 只为重要且无法由本地证据判断的业务语义调用 AI\n  • 独立审查候选知识后保存有源码证据的 patterns\n  • 为生成 skills 准备精简、可追溯的项目知识"
 
 [LearnExample]
-other = "  # 从当前代码增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service --profile skip"
+other = "  # 从当前代码增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service"
 
 [GenerateShort]
 other = "生成 AI Agent skills"
@@ -949,10 +949,10 @@ other = "隔离源码证据分析与独立知识审查"
 other = "学习议程规划"
 
 [ProgressLearnCurrentPlanFocusesRestored]
-other = "恢复学习议程（{{.Focuses}} 个焦点：开发 {{.DevelopmentFocuses}}，覆盖 {{.CoverageFocuses}}）"
+other = "恢复学习议程（{{.Focuses}} 个证据批次）"
 
 [ProgressLearnCurrentAnalyzeFocus]
-other = "{{.Label}} · 焦点 {{.Current}}/{{.Total}} · {{.Name}}"
+other = "{{.Label}} · {{.Name}}"
 
 [ProgressLearnCurrentAnalyzePreparing]
 other = "{{.Label}} · 准备本地源码分析上下文"
@@ -964,7 +964,7 @@ other = "{{.Base}} · 源码证据分析"
 other = "{{.Base}} · 独立知识审查 · 候选 {{.Candidates}}"
 
 [ProgressLearnCurrentAnalyzeBatches]
-other = "{{.Label}} · 焦点 {{.Focuses}} 个 · 批次 {{.Batches}} 个 · 并发 {{.Parallelism}}"
+other = "{{.Label}} · 证据组 {{.Focuses}} 个 · 调用批次 {{.Batches}} 个 · 并发 {{.Parallelism}}"
 
 [ProgressLearnCurrentAnalyzeParallel]
 other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} · 并发 {{.Parallelism}}"
@@ -977,12 +977,6 @@ other = "源码证据分析"
 
 [LearnCurrentFocusStageKnowledgeReview]
 other = "独立知识审查 · 候选 {{.Candidates}}"
-
-[LearnCurrentParallelActiveSingle]
-other = "{{.Batch}} 焦点 {{.Current}}/{{.Total}} {{.Name}}"
-
-[LearnCurrentParallelActiveRange]
-other = "{{.Batch}} 焦点 {{.Start}}-{{.End}}/{{.Total}} {{.Name}}"
 
 [ProgressLearnCurrentCommitFiles]
 other = "{{.Label}} · 提交 {{.Count}} 个文件状态"
@@ -997,7 +991,7 @@ other = "独立知识审查"
 other = "跳过独立知识审查（无候选或已复用）"
 
 [ProgressLearnCurrentReviewFocus]
-other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} · 焦点 {{.Current}}/{{.AgendaTotal}} {{.Name}} · 候选 {{.Candidates}}"
+other = "{{.Label}} · 审查 {{.Name}} · 候选 {{.Candidates}}"
 
 [ProgressLearnCurrentReviewComplete]
 other = "{{.Label}} · 完成 {{.Completed}}/{{.Total}} 个焦点"
@@ -1500,8 +1494,11 @@ other = "[sync] 未检测到学习变化，跳过 skills 生成"
 [SyncComplete]
 other = "[sync] 完成！"
 
+[SyncPartial]
+other = "[sync] 已保存本轮产物；业务学习尚未完成，{{.Pending}} 个候选文件待评估。后续 sync 会自动重试可处理项。"
+
 [SyncLearnCompleted]
-other = "[sync] 学习阶段完成：变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，用时 {{.Duration}}"
+other = "[sync] 本轮学习结束：变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，待评估文件 {{.Pending}} 个，用时 {{.Duration}}"
 
 [SyncWorkspaceLearnCompleted]
 other = "[sync] 工作区学习阶段完成：子项目 {{.Projects}} 个，{{.ChangedProjects}} 个有学习变化；变更 {{.Changed}} 个，删除 {{.Deleted}} 个，发现候选模式 {{.Patterns}} 个，规范化写入 {{.Saved}} 个，移除 {{.Retired}} 个"
@@ -1631,10 +1628,10 @@ other = "AI 生成用户自定义模式失败"
 other = "查看项目画像"
 
 [ProfileLongDesc]
-other = "查看由 learn current 产出的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，用于生成 references/project-overview.md，并为 generate skills 提供项目结构、依赖、关键模块和能力入口上下文。画像同步属于当前学习流程，增量学习会基于变更和 AI 建议判断是否更新。"
+other = "查看已保存的项目画像。\n\n项目画像保存于 .skills-seed/store/documents/project-profile.json，可用于生成 references/project-overview.md。该命令只读取已有文件，不调用 AI。"
 
 [ProfileExample]
-other = "  # 查看当前项目画像摘要\n  skills-seed profile show\n\n  # 在当前学习中自动判断并刷新画像\n  skills-seed learn current --profile auto"
+other = "  # 查看当前项目画像摘要\n  skills-seed profile show"
 
 [ProfileShowShort]
 other = "显示当前项目画像摘要"
@@ -1943,19 +1940,16 @@ other = "事件统计"
 other = "从当前代码学习"
 
 [LearnCurrentLongDesc]
-other = "从当前代码库生产可复用项目知识、权威规则和项目地图。\n\n此命令将：\n  • 准备候选并规划学习议程\n  • 隔离分析源码证据并独立审查知识\n  • 规范化后写入 patterns 数据库\n  • 按策略提取权威规则并刷新 .skills-seed/store/documents/project-profile.json\n  • 为 generate skills 准备已核验知识输入"
+other = "从当前代码库生产可复用项目知识。\n\n此命令将：\n  • 本地建立或更新 CodeGraph 索引\n  • 按调用关系、证据容量和业务重要性动态组批\n  • 只在本地无法判断业务决策时调用 AI，并独立审查结果\n  • 将有证据的业务 patterns 写入数据库，供 generate skills 使用"
 
 [LearnCurrentExample]
-other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录，不刷新权威规则与项目地图\n  skills-seed learn current --focus internal/service --profile skip\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
+other = "  # 从当前代码库增量学习\n  skills-seed learn current\n\n  # 只学习指定目录\n  skills-seed learn current --focus internal/service\n\n  # 多个 focus 可重复传入\n  skills-seed learn current -f internal/agent -f internal/service\n\n  # 从多个文件或目录读取本次学习补充说明\n  skills-seed learn current --context-path docs/plan.md --context-path docs/specs"
 
 [LearnFlagLanguage]
 other = "项目主要编程语言；留空时使用配置或自动识别"
 
 [LearnFlagFocus]
 other = "指定要扫描学习的目录或文件，可重复使用；路径必须在项目根目录内"
-
-[LearnFlagProfile]
-other = "权威规则与项目地图刷新策略：auto 在地图缺失或权威输入变化时刷新，skip 跳过，refresh 强制刷新"
 
 [LearnFlagContext]
 other = "本次学习的补充说明，会传给 AI Agent 作为额外约束"
@@ -1974,7 +1968,7 @@ other = "开始当前代码增量学习"
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}"
 
 [LearnCurrentFocusInfo]
-other = "指定扫描范围: {{.Focus}}\n项目画像策略: {{.ProfileMode}}"
+other = "指定扫描范围: {{.Focus}}"
 
 [LearnCurrentFallbackFocusName]
 other = "当前代码变更"
@@ -2013,7 +2007,7 @@ other = "分析产物已提交，但仍有 {{.Count}} 个证据焦点待处理"
 other = "本地过滤统计:\n  • 文件范围: 扫描 {{.ScannedFiles}}，本地排除 {{.LocalSkippedFiles}}，可学习 {{.SourceFiles}}\n  • 增量候选: 新增/修改 {{.Changed}}，删除 {{.Deleted}}，未变化 {{.Unchanged}}\n  • 待处理候选: {{.LocalPlanInputs}}"
 
 [LearnCurrentResumeSummary]
-other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据焦点 {{.Focuses}}（开发 {{.DevelopmentFocuses}}，覆盖 {{.CoverageFocuses}}）\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选准备"
+other = "恢复未完成的 {{.Command}} 执行计划:\n  • 本地过滤: 可学习 {{.SourceFiles}}，待处理 {{.LocalPlanInputs}}\n  • 候选准备: 输入 {{.SelectionInputs}}，保留 {{.SelectedFiles}}\n  • 恢复后: 待分析 {{.PendingAnalyzeFiles}}，证据批次 {{.Focuses}}\n  • 本次复用已保存议程，不重复执行文件扫描、本地过滤和候选准备"
 
 [LearnCurrentNoFileChanges]
 other = "未检测到可学习文件变化，已跳过 patterns 学习"
@@ -2084,14 +2078,11 @@ other = "focus 路径 {{.Path}} 位于项目根目录之外"
 [LearnCurrentFocusNotAccessible]
 other = "focus 路径 {{.Path}} 不可访问"
 
-[LearnCurrentProfileModeInvalid]
-other = "无效的项目画像策略 {{.Mode}}，可选值为 auto、skip 或 refresh"
-
 [LearnCurrentResult]
 other = "分析结果:\n  • 审查后候选模式数: {{.PatternsCount}}"
 
 [LearnCurrentAnalyzeFocusesSummary]
-other = "证据焦点完成：{{.Completed}}/{{.Total}} 个，批次 {{.Batches}} 个，项目内并发 {{.Parallelism}}"
+other = "证据组完成：{{.Completed}}/{{.Total}} 个，调用批次 {{.Batches}} 个，项目内并发 {{.Parallelism}}"
 
 [LearnCurrentSavePatternFailed]
 other = "保存模式失败 [{{.ID}}]: {{.Error}}"
@@ -2115,7 +2106,7 @@ other = "开始工作区增量学习: 子项目 {{.Projects}} 个，子项目并
 other = "项目根路径: {{.ProjectRoot}}\n项目名称: {{.ProjectName}}\n语言: {{.Language}}\n子项目路径: {{.Path}}"
 
 [LearnWorkspaceProjectStarted]
-other = "子项目 {{.ProjectName}} 开始增量学习，日志目录: {{.LogPath}}"
+other = "子项目 {{.ProjectName}} 开始增量学习"
 
 [LearnWorkspaceProjectSummary]
 other = "子项目 {{.ProjectName}} 处理完成: 新增或修改 {{.Changed}}，删除 {{.Deleted}}，本地排除 {{.Skipped}}，产出模式 {{.Patterns}}，写入 {{.Saved}}，移除过期模式 {{.Retired}}，耗时 {{.Duration}}"
@@ -2307,9 +2298,6 @@ other = "工作区规范"
 [ResetKnowledgeResourceChildProjectProfiles]
 other = "子项目画像"
 
-[ResetKnowledgeResourceFileSnapshots]
-other = "文件快照"
-
 [ResetKnowledgeResourceCommandCheckpoints]
 other = "命令恢复状态"
 
@@ -2454,12 +2442,6 @@ other = "已跳过 skills-seed hook。"
 [HookActionFailed]
 other = "Hook 操作失败 (skills-seed {{.Action}}): {{.Error}}"
 
-[GeneratorBusinessGroupFallbackDescription]
-other = "暂未归属到稳定代码子域的业务规则"
-
-[GeneratorBusinessGroupDescription]
-other = "围绕 {{.Title}} 的规则、状态约束、编排和数据转换证据"
-
 [KnowledgePolicyGroupRuleTitle]
 other = "用户规则"
 
@@ -2486,9 +2468,6 @@ other = "命中相同需求时先检查并优先复用这些入口；现有边�
 
 [KnowledgeClaimUsageObservation]
 other = "只能作为导航线索或复核清单，不能直接当作硬约束。"
-
-[KnowledgeRoutingBusinessFallbackTitle]
-other = "其他业务规则"
 
 [KnowledgeValidationAreaAPIName]
 other = "接口 / 契约 / 生成链路"
@@ -2862,12 +2841,6 @@ other = "关键模块"
 [GeneratorProfileReferenceModulesDescription]
 other = "关键模块路径、职责摘要和已验证入口"
 
-[GeneratorProfileReferenceCommonUtilsTitle]
-other = "通用工具"
-
-[GeneratorProfileReferenceCommonUtilsDescription]
-other = "通用工具方法及使用场景"
-
 [GeneratorBusinessMethodProjectGroupTitle]
 other = "项目级能力入口"
 
@@ -2876,12 +2849,6 @@ other = "未能稳定归属到具体模块的项目级能力入口。"
 
 [GeneratorBusinessMethodModuleGroupSummary]
 other = "同一模块或相邻路径下的能力入口，优先按本组定位复用能力。"
-
-[GeneratorInsightDeterministicGeneration]
-other = "skills 由已入库模式、项目画像和工作流确定性生成；生成阶段不调用 AI。"
-
-[GeneratorInsightCoveredCategories]
-other = "已覆盖模式分类：{{.Categories}}"
 
 [GeneratorOverviewArchitectureSummary]
 other = "已从当前代码学习到 {{.Count}} 个架构层次；本节用于导航已沉淀的结构事实，具体职责以“架构层次”和“关键模块”章节为准。"
@@ -3224,3 +3191,35 @@ other = "将要清理 runtime 目录：{{.Path}}"
 
 [ClearRuntimeCompleted]
 other = "runtime 目录已清理：{{.Path}}"
+
+[LearnFlagSemantic]
+other = "对 --focus 指定的重要范围补充 AI 语义分析与审查"
+[LearnSemanticFocusRequired]
+other = "语义学习需要 --focus 指定重要源码范围；默认 learn current 自动选择关键语义缺口"
+[LearnSemanticProjectRequired]
+other = "请进入具体子项目后使用 --semantic --focus 补充语义，工作区默认只更新本地路由"
+[LearnLocalOptionsConflict]
+other = "默认本地扫描不接受局部范围或刷新语义画像；请使用 --semantic --focus 指定需要 AI 判断的范围"
+[LearnLocalScan]
+other = "更新本地 CodeGraph 索引，按需补充关键语义"
+[LearnLocalIndex]
+other = "更新本地 CodeGraph 索引"
+[LearnLocalPlan]
+other = "规划关键语义候选"
+[LearnLocalScreenComplete]
+other = "语义预筛选：检查 {{.Reviewed}} 个结构候选，排除 {{.Skipped}} 个无长期价值候选，保留 {{.Retained}} 个待分析文件"
+[LearnLocalCommitCoverage]
+other = "提交本地结构覆盖"
+[LearnLocalSupplement]
+other = "逐批补充关键业务语义"
+[LearnLocalSupplementDetail]
+other = "逐批补充关键业务语义 · 第 {{.Batch}} 批 · 已处理 {{.Completed}}/{{.Total}} 个候选文件"
+[LearnLocalFinalize]
+other = "保存学习状态"
+[LearnLocalComplete]
+other = "本地扫描完成：{{.Files}} 个索引文件，{{.Symbols}} 个符号，{{.Unindexed}} 个未索引文件；随后检查关键语义缺口"
+[CodeGraphShort]
+other = "查询本地代码结构与已有能力（不调用 AI）"
+
+[LearnLocalPending]
+other = "还有 {{.Count}} 个候选文件待评估业务语义，详情：{{.Path}}。{{.Reason}}"

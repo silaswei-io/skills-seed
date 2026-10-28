@@ -6,6 +6,7 @@ package progress
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,8 +22,10 @@ var (
 	progressActive        bool
 	progressLineOpen      bool
 	progressPhysicalLines int
-	pendingConsoleLines   []string
-	terminalWidth         = currentTerminalWidth
+	// progressLines 保存上次已显示的内容，避免动画重画不变的明细。
+	progressLines       []string
+	pendingConsoleLines []string
+	terminalWidth       = currentTerminalWidth
 )
 
 // FastStepPause 是极短步骤完成后的最小停顿，避免进度行闪烁。
@@ -308,6 +311,7 @@ func (t *MultiTracker) finish() {
 	progressActive = false
 	progressLineOpen = false
 	progressPhysicalLines = 0
+	progressLines = nil
 	flushPendingConsoleLinesLocked()
 }
 
@@ -638,29 +642,43 @@ func renderProgressLines(lines []string, newline bool) {
 	consoleMu.Lock()
 	defer consoleMu.Unlock()
 
-	if progressPhysicalLines > 1 {
-		fmt.Fprintf(os.Stdout, "\033[%dF", progressPhysicalLines-1)
+	if !newline && slices.Equal(lines, progressLines) {
+		return
 	}
-	if progressPhysicalLines > 0 {
-		fmt.Fprint(os.Stdout, "\r\033[J")
+	// 一帧只写一次，先覆盖文字再清除行尾，避免清屏和写回之间出现空白。
+	var frame strings.Builder
+	if progressPhysicalLines > 1 {
+		fmt.Fprintf(&frame, "\033[%dF", progressPhysicalLines-1)
 	}
 	for index, line := range lines {
 		if index > 0 {
-			fmt.Fprint(os.Stdout, "\n")
+			frame.WriteByte('\n')
 		}
-		fmt.Fprintf(os.Stdout, "\r\033[2K%s", line)
+		frame.WriteByte('\r')
+		if len(lines) != len(progressLines) || line != progressLines[index] {
+			frame.WriteString(line)
+			frame.WriteString("\033[K")
+		}
+	}
+	if len(lines) < len(progressLines) {
+		frame.WriteString("\033[J")
 	}
 	if newline {
-		fmt.Fprintln(os.Stdout)
+		frame.WriteByte('\n')
+	}
+	fmt.Fprint(os.Stdout, frame.String())
+	if newline {
 		progressActive = false
 		progressLineOpen = false
 		progressPhysicalLines = 0
+		progressLines = nil
 		flushPendingConsoleLinesLocked()
 		return
 	}
 	progressActive = true
 	progressLineOpen = true
 	progressPhysicalLines = physicalLines
+	progressLines = lines
 }
 
 func formatProgressLine(done, step, total, width int, frame, label string, elapsed time.Duration) string {
@@ -743,6 +761,7 @@ func PrintConsoleLineNow(message string) {
 		progressActive = false
 		progressLineOpen = false
 		progressPhysicalLines = 0
+		progressLines = nil
 	}
 	fmt.Fprintln(os.Stdout, message)
 }

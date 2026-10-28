@@ -54,6 +54,9 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	cfg.Agent.Commands = map[string]string{"noop": "noop"}
 	cfg.Skills.Locale = "en-US"
 	require.NoError(t, configRepo.Update(cfg))
+	legacySnapshots := filepath.Join(seedPath, "cache", "snapshots")
+	require.NoError(t, os.MkdirAll(legacySnapshots, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(legacySnapshots, "files.json"), []byte(`{"internal/service.go":"source"}`), 0o644))
 
 	var capturedLoader *promptloader.Loader
 	restoreFactory := RegisterAgentFactoryForTest("noop", func(opts AgentFactoryOptions) agent.Agent {
@@ -65,6 +68,7 @@ func TestNewContainerUsesSkillsLocaleForPromptLoader(t *testing.T) {
 	cont, err := NewContainer(context.Background(), seedPath)
 	require.NoError(t, err)
 	defer cont.Close()
+	require.NoDirExists(t, legacySnapshots)
 
 	require.Same(t, cont.PromptLoader, capturedLoader)
 	prompt, err := cont.PromptLoader.Render("core-user-pattern", map[string]interface{}{

@@ -1,5 +1,7 @@
 # Operation Model
 
+Default learning scans locally with bundled CodeGraph, groups candidates along real call paths, then analyzes and independently reviews remaining semantic gaps in dynamic evidence batches. Pending gaps and failure reasons are recorded in `.skills-seed/runtime/local-supplement.json`; a normal `sync` retries unfinished stages. Use `learn current --semantic --focus <path>` for explicit deeper analysis. Query existing capabilities with `skills-seed codegraph query`, then inspect callers/callees/impact/trace before creating a new implementation. Structural navigation is not proof of complete business understanding.
+
 `skills-seed` is a repository knowledge and Skill generation CLI. It learns project conventions, stores durable knowledge under `.skills-seed`, and renders AI-agent Skills from that state.
 
 ## Command Groups

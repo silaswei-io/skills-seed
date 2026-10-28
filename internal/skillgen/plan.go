@@ -20,8 +20,6 @@ type File struct {
 type Plan struct {
 	OutputPath        string
 	Files             []File
-	CreateDirs        []string
-	RemovePaths       []string
 	AgentMetadataData any
 }
 
@@ -36,12 +34,4 @@ func (p *Plan) AddFile(path string, kind TemplateKind, template string, data any
 		Template: template,
 		Data:     data,
 	})
-}
-
-func (p *Plan) AddDir(path string) {
-	p.CreateDirs = append(p.CreateDirs, path)
-}
-
-func (p *Plan) RemovePath(path string) {
-	p.RemovePaths = append(p.RemovePaths, path)
 }

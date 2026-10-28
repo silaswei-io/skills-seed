@@ -633,8 +633,6 @@ learning:
     pattern_admission:
       min_confidence: 0.62
       min_single_evidence_confidence: 0.79
-    agenda:
-      fallback_paths_per_focus: 17
 skills:
   paths: {}
 logging:
@@ -648,7 +646,6 @@ exclude:
 	admission := repo.GetCurrentLearningConfig().PatternAdmission
 	require.Equal(t, 0.62, admission.MinConfidence)
 	require.Equal(t, 0.79, admission.MinSingleEvidenceConfidence)
-	require.Equal(t, 17, repo.GetCurrentLearningConfig().Agenda.FallbackPathsPerFocus)
 }
 
 func TestRepository_PreservesExplicitStructuralDisabled(t *testing.T) {
@@ -821,6 +818,7 @@ func TestRepository_GetLoggingConfig(t *testing.T) {
 	repo := setupTestConfig(t)
 	loggingCfg := repo.GetLoggingConfig()
 
+	assert.False(t, loggingCfg.Enabled)
 	assert.Equal(t, "DEBUG", loggingCfg.Level)
 	assert.Equal(t, "runtime/logs", loggingCfg.LogsPath)
 	assert.Equal(t, 30, loggingCfg.MaxLogFiles)

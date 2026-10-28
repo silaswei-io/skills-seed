@@ -51,7 +51,7 @@ func TestValidateContractResultSupportsEveryOutputContract(t *testing.T) {
 		{aicontract.ContractAuthorityExtraction, `{}`},
 		{aicontract.ContractAnalyzeCurrentCodebaseBatch, `{"focuses":[]}`},
 		{aicontract.ContractAnalyzeCurrentDeltaBatch, `{"knowledge_changes":[],"profile_refresh_recommended":{"needed":false}}`},
-		{aicontract.ContractPlanLearningAgenda, `{}`},
+		{aicontract.ContractSemanticScreen, `{"skip":[]}`},
 		{aicontract.ContractReviewKnowledge, `{"decisions":[{"candidate_id":"candidate-1","verdict":"accept","reason_code":"accepted","reason":"Supported."}]}`},
 		{aicontract.ContractNormalizePatterns, `{}`},
 		{aicontract.ContractWorkspaceProfile, `{}`},

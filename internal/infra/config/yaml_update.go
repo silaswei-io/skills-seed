@@ -29,8 +29,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
-	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "scope", "budget", "max_focuses_per_call", "select_relevant_files", "select_relevant_files_min_candidates")
-	setYAMLInt(doc, []string{"learning", "current", "agenda", "fallback_paths_per_focus"}, cfg.Learning.Current.Agenda.FallbackPathsPerFocus)
+	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "local", "scope", "budget", "max_focuses_per_call", "select_relevant_files", "select_relevant_files_min_candidates")
 	setYAMLBool(doc, []string{"learning", "current", "structural", "enabled"}, cfg.Learning.Current.Structural.Enabled)
 	setYAMLString(doc, []string{"learning", "current", "structural", "provider"}, string(cfg.Learning.Current.Structural.Provider))
 	setYAMLInt(doc, []string{"learning", "current", "structural", "max_symbols"}, cfg.Learning.Current.Structural.MaxSymbols)
@@ -50,6 +49,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	setYAMLString(doc, []string{"skills", "locale"}, cfg.Skills.Locale)
 	setYAMLStringMap(doc, []string{"skills", "paths"}, cfg.Skills.Paths)
 
+	setYAMLBool(doc, []string{"logging", "enabled"}, cfg.Logging.Enabled)
 	setYAMLString(doc, []string{"logging", "level"}, cfg.Logging.Level)
 	setYAMLString(doc, []string{"logging", "logs_path"}, cfg.Logging.LogsPath)
 	setYAMLInt(doc, []string{"logging", "max_log_files"}, cfg.Logging.MaxLogFiles)

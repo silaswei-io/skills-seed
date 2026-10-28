@@ -2,23 +2,17 @@ package sourcecode
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
-	"sync"
 
-	"github.com/silaswei-io/skills-seed/internal/codegraph"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
-
-const codeGraphQueryLimit = 100
 
 // Reference 描述需要由结构化索引确认的源码符号。
 type Reference struct {
@@ -34,21 +28,6 @@ type Catalog map[string][]Symbol
 // Resolver 将一组源码引用解析为符号目录。
 type Resolver interface {
 	Resolve(ctx context.Context, projectRoot string, refs []Reference) (Catalog, error)
-}
-
-// NewResolver 根据结构化 provider 创建唯一的符号解析入口。
-func NewResolver(cfg config.StructuralConfig) Resolver {
-	switch config.NormalizeStructuralProvider(string(cfg.Provider)) {
-	case config.StructuralProviderTreeSitter:
-		return treeSitterResolver{}
-	case config.StructuralProviderCodeGraph:
-		return newCodeGraphResolver(codegraph.NewClient("codegraph"))
-	default:
-		return fallbackResolver{
-			primary:  newCodeGraphResolver(codegraph.NewClient("codegraph")),
-			fallback: treeSitterResolver{},
-		}
-	}
 }
 
 type treeSitterResolver struct{}
@@ -75,126 +54,6 @@ func (treeSitterResolver) Resolve(ctx context.Context, projectRoot string, refs 
 		catalog[path] = symbols
 	}
 	return catalog, nil
-}
-
-type fallbackResolver struct {
-	primary  Resolver
-	fallback Resolver
-}
-
-func (r fallbackResolver) Resolve(ctx context.Context, projectRoot string, refs []Reference) (Catalog, error) {
-	catalog, err := r.primary.Resolve(ctx, projectRoot, refs)
-	if err == nil {
-		return catalog, nil
-	}
-	if !isCodeGraphFallbackError(err) {
-		return nil, err
-	}
-	return r.fallback.Resolve(ctx, projectRoot, refs)
-}
-
-type codeGraphClient interface {
-	EnsureReady(ctx context.Context, projectRoot string) (*codegraph.Status, error)
-	Run(ctx context.Context, projectRoot string, args ...string) (string, error)
-}
-
-func isCodeGraphFallbackError(err error) bool {
-	return errors.Is(err, codegraph.ErrUnavailable) || errors.Is(err, codegraph.ErrNotReady)
-}
-
-type codeGraphResolver struct {
-	client codeGraphClient
-}
-
-func newCodeGraphResolver(client codeGraphClient) *codeGraphResolver {
-	return &codeGraphResolver{client: client}
-}
-
-func (r *codeGraphResolver) Resolve(ctx context.Context, projectRoot string, refs []Reference) (Catalog, error) {
-	queries := referenceNames(refs)
-	if len(queries) == 0 {
-		return Catalog{}, nil
-	}
-	if _, err := r.client.EnsureReady(ctx, projectRoot); err != nil {
-		return nil, err
-	}
-
-	wanted := wantedReferences(refs)
-	catalog := Catalog{}
-	var mu sync.Mutex
-	var firstErr error
-	jobs := make(chan string)
-	var workers sync.WaitGroup
-	workerCount := min(4, len(queries))
-	for range workerCount {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
-			for name := range jobs {
-				nodes, err := r.query(ctx, projectRoot, name)
-				if err != nil {
-					mu.Lock()
-					if firstErr == nil {
-						firstErr = err
-					}
-					mu.Unlock()
-					continue
-				}
-				mu.Lock()
-				for _, node := range nodes {
-					path := normalizeReferencePath(node.FilePath)
-					if node.Name != name || !wanted[path][name] {
-						continue
-					}
-					catalog[path] = append(catalog[path], Symbol{
-						Name:      node.Name,
-						Kind:      canonicalKind(node.Kind),
-						Line:      node.StartLine,
-						Signature: codeGraphSignature(node),
-					})
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-	for _, query := range queries {
-		jobs <- query
-	}
-	close(jobs)
-	workers.Wait()
-	if firstErr != nil {
-		return nil, firstErr
-	}
-	return catalog, nil
-}
-
-type codeGraphNode struct {
-	Name          string `json:"name"`
-	QualifiedName string `json:"qualifiedName"`
-	Kind          string `json:"kind"`
-	FilePath      string `json:"filePath"`
-	StartLine     int    `json:"startLine"`
-	Signature     string `json:"signature"`
-}
-
-type codeGraphResult struct {
-	Node codeGraphNode `json:"node"`
-}
-
-func (r *codeGraphResolver) query(ctx context.Context, projectRoot, name string) ([]codeGraphNode, error) {
-	output, err := r.client.Run(ctx, projectRoot, "query", "-p", projectRoot, "-j", "-l", fmt.Sprintf("%d", codeGraphQueryLimit), name)
-	if err != nil {
-		return nil, fmt.Errorf("query CodeGraph symbol %q: %w: %s", name, err, strings.TrimSpace(output))
-	}
-	var results []codeGraphResult
-	if err := json.Unmarshal([]byte(output), &results); err != nil {
-		return nil, fmt.Errorf("decode CodeGraph symbol %q: %w", name, err)
-	}
-	nodes := make([]codeGraphNode, 0, len(results))
-	for _, result := range results {
-		nodes = append(nodes, result.Node)
-	}
-	return nodes, nil
 }
 
 // EvidenceReferences 返回模式证据中的符号引用。
@@ -237,32 +96,6 @@ func referencePaths(refs []Reference) []string {
 	return sortedKeys(seen)
 }
 
-func referenceNames(refs []Reference) []string {
-	seen := map[string]bool{}
-	for _, ref := range refs {
-		if name := simpleSymbolName(ref.Name); name != "" && normalizeReferencePath(ref.Path) != "" {
-			seen[name] = true
-		}
-	}
-	return sortedKeys(seen)
-}
-
-func wantedReferences(refs []Reference) map[string]map[string]bool {
-	wanted := map[string]map[string]bool{}
-	for _, ref := range refs {
-		path := normalizeReferencePath(ref.Path)
-		name := simpleSymbolName(ref.Name)
-		if path == "" || name == "" {
-			continue
-		}
-		if wanted[path] == nil {
-			wanted[path] = map[string]bool{}
-		}
-		wanted[path][name] = true
-	}
-	return wanted
-}
-
 func normalizeReferencePath(path string) string {
 	return pathx.CleanEvidenceLocationPath(path)
 }
@@ -276,21 +109,6 @@ func resolveProjectFile(projectRoot, path string) (string, bool) {
 	return resolved, err == nil
 }
 
-func codeGraphSignature(node codeGraphNode) string {
-	signature := strings.TrimSpace(node.Signature)
-	if signature == "" {
-		return ""
-	}
-	name := strings.ReplaceAll(strings.TrimSpace(node.QualifiedName), "::", ".")
-	if name == "" {
-		name = node.Name
-	}
-	if strings.HasPrefix(signature, node.Name) || strings.HasPrefix(signature, name) {
-		return signature
-	}
-	return name + signature
-}
-
 func sortedKeys(values map[string]bool) []string {
 	keys := make([]string, 0, len(values))
 	for value := range values {
@@ -298,4 +116,20 @@ func sortedKeys(values map[string]bool) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// NewResolver 使用本地语法树核验精确证据，结构索引统一由内嵌 CodeGraph 提供。
+func NewResolver(_ config.StructuralConfig) Resolver { return treeSitterResolver{} }
+
+// EvidenceDigest 验证路径归属后读取当前内容，供已审查证据失效判断使用。
+func EvidenceDigest(root, path string) (string, error) {
+	resolved, ok := resolveProjectFile(root, path)
+	if !ok {
+		return "", fmt.Errorf("evidence leaves project: %s", path)
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }

@@ -48,12 +48,19 @@
 
 | 命令 | 摘要 | 子命令 | 参数 |
 |---|---|---|---|
-| `skills-seed` | 为 AI 助手培育项目技能 | `clear`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | 为 AI 助手培育项目技能 | `clear`, `cli-skills`, `codegraph`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed clear` | 清理可重建运行时数据 | `runtime` | `--help, -h` = `false` |
 | `skills-seed clear runtime` | 清理 runtime 目录 | - | `--dry-run` = `false`<br>`--force` = `false`<br>`--help, -h` = `false` |
 | `skills-seed cli-skills` | 管理全局 skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | 安装/更新全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | 卸载全局 CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
+| `skills-seed codegraph` | 查询本地代码结构与已有能力（不调用 AI） | `callees <symbol-id>`, `callers <symbol-id>`, `impact <symbol-id>`, `node <symbol-id>`, `query <search-text>`, `trace <from-id> <to-id>` | `--help, -h` = `false` |
+| `skills-seed codegraph callees <symbol-id>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
+| `skills-seed codegraph callers <symbol-id>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
+| `skills-seed codegraph impact <symbol-id>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
+| `skills-seed codegraph node <symbol-id>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
+| `skills-seed codegraph query <search-text>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
+| `skills-seed codegraph trace <from-id> <to-id>` | 查询本地代码结构与已有能力（不调用 AI） | - | `--help, -h` = `false` |
 | `skills-seed generate` | 生成 AI Agent skills | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | 生成 AI Agent skills | - | `--help, -h` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | 管理 Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
@@ -62,7 +69,7 @@
 | `skills-seed hook uninstall` | 卸载 Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | 初始化 skills-seed 项目 | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills-name` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | 从当前代码学习 | `current` | `--help, -h` = `false` |
-| `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | 从当前代码学习 | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--semantic` = `false` |
 | `skills-seed log` | 查看学习变更记录 | - | `--help, -h` = `false` |
 | `skills-seed patterns` | 管理已学习的 patterns | `add (--content <description> \| --content-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--content <description> \| --content-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--content <description> \| --content-path <path>)` | 用自然语言添加用户自定义模式 | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
@@ -276,7 +283,7 @@ skills-seed reset patterns rules workflows
 
 | 命令形式 | 说明 | 常用示例 | 注意事项 |
 |---|---|---|---|
-| `skills-seed learn current` | 从当前代码库增量学习 | `skills-seed learn current --focus internal/service --profile skip` | 会比较文件 md5，只学习新增、修改或删除的文件；提示词或模板升级后可加 `--force` 重新学习当前扫描范围 |
+| `skills-seed learn current` | 从当前代码库增量学习 | `skills-seed learn current --focus internal/service` | 会比较文件 md5，只学习新增、修改或删除的文件；提示词或模板升级后可加 `--force` 重新学习当前扫描范围 |
 
 #### `learn` 参数
 
@@ -290,25 +297,15 @@ skills-seed reset patterns rules workflows
 |---|---:|---|
 | `--language`, `-l` | 配置或自动识别 | 项目主要语言 |
 | `--focus`, `-f` | 空 | 只学习指定目录或文件；可重复使用，路径必须在项目根目录内 |
-| `--profile` | `auto` | 权威规则与项目地图刷新策略：`auto`、`skip`、`refresh` |
 | `--context` | 空 | 本次学习的一次性补充说明，会传给 AI Agent，不写入 `.skills-seed/context/` |
 | `--context-path` | 空 | 从文件或目录读取本次学习的一次性补充说明；可重复传入，不写入 `.skills-seed/context/` |
 | `--help`, `-h` | `false` | 查看 `learn current` 帮助 |
-
-#### `--profile` 取值
-
-| 取值 | 说明 |
-|---|---|
-| `auto` | 项目地图不存在或权威输入内容版本变化时刷新；否则复用现有地图 |
-| `skip` | 只学习源码知识，不刷新权威规则与项目地图 |
-| `refresh` | 基于当前输入强制重新提取权威规则并刷新项目地图 |
 
 #### 常用示例
 
 ```bash
 skills-seed learn current
-skills-seed learn current --focus internal/service --profile skip
-skills-seed learn current --force --profile refresh
+skills-seed learn current --focus internal/service
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "只关注兼容性边界"
 skills-seed learn current --context-path .skills-seed/context.md
@@ -316,16 +313,16 @@ skills-seed learn current --context-path .skills-seed/context.md
 
 #### 注意事项
 
-1. 首次成功后会记录已分析文件的 md5；没有可学习文件变化时，会跳过源码知识分析、评审和入库。`auto` 仍会比较权威输入内容版本，权威文件变化时继续刷新权威规则与项目地图。
+1. 本地扫描覆盖全部入选文件；无需自动补充的变更记录为 `selection_skipped`，候选文件只有完成 AI 分析、评审和入库后才记为语义已确认。没有可学习变化时跳过重复分析。普通结构和通用实现不会进入长期知识。
 2. 生成的 skills 目录默认排除，包括配置中的 `skills.paths`、`.claude/skills/**` 和 `.agents/skills/**`。
 3. workspace 根仓只编排，不把子仓 patterns 写入根仓。
-4. project 模式下，`agent.parallelism > 1` 会并发分析独立证据焦点批次；结果仍按学习议程序合并和 checkpoint。
-5. workspace 根配置的 `agent.parallelism` 控制子项目并发；每个子项目内证据焦点并发由该子项目配置决定。
-6. workspace 子项目完成后，根仓还会继续分析工作区画像、工作区规范并保存关系产物；终端会显示对应进度，避免长耗时 Agent 调用看起来像卡住。
-7. workspace 根仓会对工作区关系事实输入记录 md5；当 `workspace.projects`、子项目画像和本次一次性说明未变化，且 workspace profile/spec 已存在时，会跳过根仓画像和规范分析。skills 产物由 `generate skills` 或 `sync` 强制全量重建。
+4. 本地分析持续处理正常候选；workspace 子项目共享 Agent 并发额度，单次 Agent 调用仍受独立 timeout 和重试策略保护。
+5. 每次语义补充可以包含任意数量的相关问题；只有证据超过字节预算或关系无关时才拆分。
+6. workspace 关系产物由显式项目配置和已保存的本地知识生成，不再单独调用 AI 生成项目画像。
+7. 生成的 Skill 只保留精简业务知识和 CodeGraph 查询入口，完整符号图留在本地。
 8. 长期有效的项目上下文写入 `.skills-seed/context/`；`--context` 和 `--context-path` 只影响本次命令。
-9. `learn current` 会基于文件快照识别新增、修改、删除三类状态；分析完成后按当前作用范围覆盖快照，下一次学习会从新的干净快照计算 diff。
-10. 有 focus、diff、sample 或入口文件等边界输入时，源码证据分析和项目地图刷新会使用 `learning.current.structural` 的结构化上下文；默认 `provider: auto` 优先使用 CodeGraph，并在 CodeGraph 命令或索引不可用时回退内嵌 tree-sitter。显式 `provider: codegraph` 会强制使用 CodeGraph。没有边界输入时不会因此全仓扫描。
+9. `learn current` 通过文件指纹识别新增、修改、删除；分析完成后提交当前范围的指纹，不保存完整源码快照。语义复核使用当前源码证据与已有知识。
+10. 本地 CodeGraph 负责文件、符号、调用关系和影响范围；自动语义候选来自变更的既有业务证据与跨文件行为入口。完整相关符号和调用路径按证据容量动态组批，不按固定问题数切分；`--semantic --focus` 可深挖已扫描文件。
 11. Agent 遇到 429 / 529 / overloaded 等可重试错误时，会按 `agent.retry` 重试；当前进度行会显示 Agent 错误、本次调用耗时和退避等待，终端也会输出包含等待时间和 API 原因的稳定提示，并在下一次调用开始时切换为“第 N 次尝试”。
 
 ### `skills-seed generate`
@@ -382,13 +379,16 @@ references/
   project-spec.md
   modules.md
   business-methods.md
+  business-methods/*.md
   patterns/*.md
+  patterns/business/*.md
+  patterns/business/items/*.md
 rules/*.md
 workflows/*.md
 scripts/workflows/
 ```
 
-Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `description` 判断是否命中。生成器会在 `description` 中保留项目名，并覆盖需求实现、问题排查、业务流程、接口与数据契约、配置、模块边界、Rule/Workflow、生成产物和验证等通用项目任务；正文只负责命中后的最小 reference 路由。`SKILL.md` 也会包含摘要阶段产出的关键洞察（如果 Agent 返回该字段），用于补充入口 skill 中的项目判断依据。
+Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `description` 判断是否命中。生成器会在 `description` 中保留项目名，并覆盖需求实现、问题排查、业务流程、接口与数据契约、配置、模块边界、Rule/Workflow、生成产物和验证等通用项目任务；正文只负责命中后的最小 reference 路由。
 
 #### 注意事项
 
@@ -419,7 +419,7 @@ Agent 在加载正文前只用 `SKILL.md` frontmatter 的 `name` 和 `descriptio
 
 | 参数 | 默认值 | 说明 |
 |---|---:|---|
-| `--mode` | `full` | 预览模式：`full`/`first` 预览全量选择，`incremental`/`current` 预览当前快照 diff |
+| `--mode` | `full` | 预览模式：`full`/`first` 预览全量选择，`incremental`/`current` 预览文件指纹增量 |
 | `--focus`, `-f` | 空 | 只预览这些路径下的文件；可重复使用 |
 | `--help`, `-h` | `false` | 查看 `preview files` 帮助 |
 
@@ -435,7 +435,7 @@ skills-seed preview files --mode incremental --focus internal/service
 #### 注意事项
 
 1. `preview files` 和 `learn current` 共用文件过滤策略，可用于确认哪些文件会进入学习分析。
-2. `--mode incremental` 会基于当前文件快照展示新增、修改和删除候选；如果还没有快照，结果会接近首次学习范围。
+2. `--mode incremental` 会基于已保存的文件指纹展示新增、修改和删除候选；首次学习时结果接近全量范围。
 3. 预览结果会写入 `.skills-seed/runtime/preview/files/`，终端只输出报告目录和文件名；确认后可删除该报告文件。
 
 ### `skills-seed patterns`
@@ -540,7 +540,7 @@ skills-seed patterns show business-create-order --format json
 
 #### 命令概述
 
-查看项目地图的兼容画像文件。该文件位于 `.skills-seed/store/documents/project-profile.json`，用于生成 `references/project-overview.md`。`learn current --profile auto` 会在地图缺失或权威输入内容变化时刷新权威规则与项目地图；`--profile refresh` 可强制刷新。
+查看项目地图的兼容画像文件。该文件位于 `.skills-seed/store/documents/project-profile.json`，用于生成 `references/project-overview.md`。项目画像由已有知识和工作区关系确定性生成；`profile show` 只读取已保存的画像。
 
 #### 命令形式
 
@@ -558,15 +558,13 @@ skills-seed patterns show business-create-order --format json
 
 ```bash
 skills-seed profile show
-skills-seed learn current --profile auto
-skills-seed learn current --profile refresh
 ```
 
 #### 注意事项
 
 1. `profile show` 适合快速确认当前画像内容。
-2. 权威规则与项目地图刷新属于当前学习流程；`auto` 根据项目地图是否存在及权威输入内容版本确定是否刷新，不依赖 Agent 回显输入边界。
-3. 刷新时先提取显式权威规则，再由独立 Agent 重读相同权威来源复核遗漏和候选表述；两阶段都返回完整章节结果。构建脚本、CI 和自动化声明可以描述现有实现，但不会单独授予 Agent 命令执行权限。
+2. 项目画像只由已保存的本地知识和工作区关系生成，不触发额外 AI 调用。
+3. 业务语义补充会保留源码证据和审查结果；构建脚本、CI 和自动化声明可以作为上下文，但不会单独授予 Agent 命令执行权限。
 
 ### `skills-seed rule`
 
@@ -736,7 +734,7 @@ skills-seed log
 
 1. `sync`、`learn current`、`generate skills` 会写入运行记录。
 2. 工作区根目录会合并子项目运行记录后再展示。
-3. 详细诊断日志仍保留在 `.skills-seed/runtime/logs/`，用于排障。
+3. 文件诊断日志默认关闭；需要排障时将 `logging.enabled` 设为 `true`，日志写入 `.skills-seed/runtime/logs/`。终端消息与运行记录不受影响。
 
 ### `skills-seed help`
 

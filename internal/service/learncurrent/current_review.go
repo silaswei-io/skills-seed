@@ -2,11 +2,14 @@ package learncurrent
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
 )
 
 func (r *learnCurrentProjectRun) mergeFocusResults(results []learnCurrentFocusResult) int {
@@ -43,11 +46,6 @@ func (r *learnCurrentProjectRun) checkpointFocusResult(result learnCurrentFocusR
 }
 
 func (r *learnCurrentProjectRun) commitCurrentAnalysis(ctx context.Context) error {
-	if r.codebaseRunContext != nil && r.codebaseRunContext.SnapshotFlow != nil {
-		if err := r.codebaseRunContext.SnapshotFlow.CommitScoped(analysisCandidatePaths(r.incrementalChanges)); err != nil {
-			return err
-		}
-	}
 	return fileanalysis.CommitCurrentChanges(ctx, r.cont.FileTracker, r.incrementalChanges)
 }
 
@@ -79,7 +77,11 @@ func (r *learnCurrentProjectRun) reviewRemainingKnowledge(label string) error {
 	if len(pending) == 0 || r.patternsCommitted() {
 		return nil
 	}
-	_, err := r.analyzePlannedBatches(label, r.analysisState, nil, 1)
+	parallelism := 1
+	if r.cont != nil && r.cont.ConfigRepo != nil {
+		parallelism = agent.EffectiveParallelism(r.cont.ConfigRepo.GetAgentConfig().Parallelism)
+	}
+	_, err := r.analyzePlannedBatches(label, r.analysisState, nil, parallelism)
 	return err
 }
 
@@ -94,33 +96,92 @@ func (r *learnCurrentProjectRun) pendingKnowledgeReviews() []knowledgeReviewTask
 	return tasks
 }
 
-func (r *learnCurrentProjectRun) reviewKnowledgeFocus(ctx context.Context, task knowledgeReviewTask) ([]domain.Pattern, error) {
+func (r *learnCurrentProjectRun) reviewKnowledgeFocus(ctx context.Context, task knowledgeReviewTask, conversation agent.Conversation) ([]domain.Pattern, error) {
 	runtimeLabel := r.analysisBatchRuntimeLabel(r.analysisState, learnCurrentBatch{
 		index:   task.index,
 		focuses: []indexedEvidenceFocus{{index: task.index, focus: task.unit.Focus}},
 	})
+	candidates := task.unit.Patterns
+	if agent.CurrentLearningSupplement(ctx) != nil {
+		candidates = nil
+		for _, pattern := range task.unit.Patterns {
+			if pattern.IsSemanticKnowledge() {
+				candidates = append(candidates, pattern)
+			}
+		}
+	}
 	patterns, err := r.cont.PatternNormSvc.ReviewCurrentKnowledge(ctx, patternnorm.ReviewRequest{
 		ProjectName:  r.projectName,
 		RootPath:     r.projectRoot,
 		Language:     r.currentLanguage,
 		RuntimeLabel: runtimeLabel,
 		Focus:        task.unit.Focus,
-		Candidates:   task.unit.Patterns,
+		Candidates:   candidates,
 		Evidence:     task.unit.Evidence.Clone(),
 		UserContext:  r.opts.userContext,
-		Conversation: r.focusConversation(task.unit.Focus),
+		Conversation: conversation,
 	})
 	return patterns, err
 }
 
 func (r *learnCurrentProjectRun) applyKnowledgeReviewResult(task knowledgeReviewTask, patterns []domain.Pattern) {
 	unit := task.unit
-	focus := domain.DevelopmentFocusFromEvidenceFocus(unit.Focus)
-	for index := range patterns {
-		patterns[index].DevelopmentFocus = focus.Clone()
+	if input := agent.CurrentLearningSupplement(r.ctx); input != nil {
+		verified := make([]domain.Pattern, 0, len(patterns))
+		for _, pattern := range patterns {
+			pattern.BusinessMethod = verifiedSupplementMethod(pattern.BusinessMethod, input)
+			valid := pattern.IsSemanticKnowledge() && len(pattern.EvidenceLocations) > 0
+			for i, evidence := range pattern.EvidenceLocations {
+				hash := input.SourceHashes[evidence.Path]
+				if hash == "" {
+					valid = false
+					break
+				}
+				if evidence.Line > 0 {
+					covered := false
+					for _, sourceRange := range input.SourceRanges[evidence.Path] {
+						covered = covered || sourceRange.Start <= evidence.Line && evidence.Line <= sourceRange.End
+					}
+					if !covered {
+						valid = false
+						break
+					}
+				}
+				pattern.EvidenceLocations[i].ContentHash = hash
+			}
+			if valid {
+				verified = append(verified, pattern)
+			}
+		}
+		patterns = verified
 	}
 	unit.Patterns = append([]domain.Pattern(nil), patterns...)
 	unit.Reviewed = true
 	r.setFocusKnowledge(unit)
 	r.syncDerivedKnowledge()
+}
+
+// verifiedSupplementMethod 用本轮 CodeGraph 符号事实覆盖 AI 声明的入口签名。
+func verifiedSupplementMethod(method *domain.BusinessMethod, input *agent.LearningSupplement) *domain.BusinessMethod {
+	if method == nil || input == nil {
+		return nil
+	}
+	location := method.DisplayLocation()
+	path := pathx.CleanEvidenceLocationPath(location)
+	separator := strings.LastIndex(location, ":")
+	if path == "" || separator < 0 {
+		return nil
+	}
+	line, err := strconv.Atoi(location[separator+1:])
+	if err != nil || line < 1 {
+		return nil
+	}
+	for _, symbol := range input.Symbols[path] {
+		if symbol.Line == line && symbol.Name == method.Name {
+			verified := *method
+			verified.Function = symbol.Signature
+			return &verified
+		}
+	}
+	return nil
 }

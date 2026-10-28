@@ -294,43 +294,6 @@ func writeMaintainedGuidanceInput(session *PromptInputSession, guidance maintain
 	return path, nil
 }
 
-// PlanLearningAgendaPromptData 返回源码证据学习议程规划所需的提示词数据。
-func PlanLearningAgendaPromptData(session *PromptInputSession, req *PlanLearningAgendaRequest) (map[string]interface{}, error) {
-	focusPathsPath, focusPathCount, err := writePathListInput(session, "analysis-files.txt", req.FocusPaths)
-	if err != nil {
-		return nil, promptInputWriteError("analysis-files.txt", err)
-	}
-	sourceFactsPath, err := writeJSONInput(session, "planning-source-facts.json", req.SourceFacts)
-	if err != nil {
-		return nil, promptInputWriteError("planning-source-facts.json", err)
-	}
-	structuralContextPath, err := session.UsePathOrWrite(req.StructuralContextPath, "structural-context.md", req.StructuralContext)
-	if err != nil {
-		return nil, promptInputWriteError("structural-context.md", err)
-	}
-	userContextPath, err := session.Write("user-context.md", req.UserContext)
-	if err != nil {
-		return nil, promptInputWriteError("user-context.md", err)
-	}
-	guidancePath, err := writeMaintainedGuidanceInput(session, req.MaintainedGuidance)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"ProjectName":            req.ProjectName,
-		"RootPath":               req.RootPath,
-		"Language":               req.Language,
-		"FocusPathsPath":         focusPathsPath,
-		"FocusPathCount":         focusPathCount,
-		"SourceFactsPath":        sourceFactsPath,
-		"SourceFactCount":        len(req.SourceFacts),
-		"StructuralContextPath":  structuralContextPath,
-		"UserContextPath":        userContextPath,
-		"MaintainedGuidancePath": guidancePath,
-		"LearningMode":           promptLearningMode(req.LearningMode),
-	}, nil
-}
-
 // AnalyzeProjectPromptData 返回项目画像分析所需的提示词数据。
 func AnalyzeProjectPromptData(session *PromptInputSession, req *AnalyzeProjectRequest) (map[string]interface{}, error) {
 	structurePath, err := session.UsePathOrWrite(req.StructurePath, "project-structure.txt", stringx.NormalizeStructureSummary(req.Structure))

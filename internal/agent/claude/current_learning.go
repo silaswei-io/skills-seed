@@ -19,12 +19,12 @@ func (c *ClaudeAgent) InvokeStructured(ctx context.Context, in agent.StructuredI
 	return agent.StructuredResult{Output: output, Conversation: conversation}, err
 }
 
-func (c *ClaudeAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	return learning.PlanLearningAgenda(ctx, c, req)
-}
-
 func (c *ClaudeAgent) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	return learning.NormalizePatterns(ctx, c, req)
+}
+
+func (c *ClaudeAgent) ScreenSemanticGaps(ctx context.Context, req *agent.SemanticScreenRequest) (*agent.SemanticScreenResult, error) {
+	return learning.ScreenSemanticGaps(ctx, c, req)
 }
 
 func (c *ClaudeAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {

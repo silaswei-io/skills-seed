@@ -1,5 +1,27 @@
 # Skills Seed Configuration Reference
 
+## Local scanning and focused semantic enrichment
+
+`learn current` and `sync` update a local structure index using bundled CodeGraph 1.6.2, without AI for structural scanning. Only important semantic gaps trigger automatic analysis and independent review; whole-repository AI agenda planning is skipped. Source builds must run `make bundle` first, or set `SKILLS_SEED_CODEGRAPH_HOME` to an official platform package. Release binaries extract the component into the user cache on first use; no global Node/npm or runtime download is required.
+
+```bash
+skills-seed sync
+skills-seed codegraph query "HTTP"
+# Optionally request deeper analysis of a concrete scope:
+skills-seed learn current --semantic --focus internal/order --context "Check order cancellation state boundaries"
+skills-seed generate skills
+```
+
+Generated `references/code-navigation.md` links directories to source symbols and instructs development agents to search existing capabilities, inspect signatures and usage examples, then reuse, extend or justify a new component. Directories are structural navigation, not inferred business domains. `codegraph callers/callees/impact` take returned symbol IDs; `codegraph trace <from-id> <to-id>` finds static call paths. Dynamic and cross-service relationships may be incomplete; an empty result does not prove that no reusable capability exists.
+
+The index lives in the standard `.codegraph/` directory and is shared with other CodeGraph tools. Skills-seed adds its own `navigation.json` and lock file; a narrower scan does not recreate the shared database. Source selection follows repository exclusions and excludes generated Skills and caches. Files not indexed by the SDK are listed explicitly. Extraction failures return errors rather than claiming success.
+
+Structural scans alone never advance semantic fingerprints. Only successfully analyzed, reviewed and stored supplements commit their scoped fingerprints; unfinished checkpoints remain available. Generation omits old Patterns whose source evidence fingerprints changed, retaining the original knowledge in storage. Project navigation is generated deterministically from the local index and saved knowledge; when source evidence changes, generation only stops projecting invalidated business patterns. Rule/Workflow maintenance is unchanged. Consuming agents must read applicable authority files directly.
+
+Workspace routing comes from explicit configuration without AI inference of cross-project semantics. Children use the same automatic supplementation policy. Run `--semantic --focus` inside a child for deeper analysis. `--context` is passed to automatic supplements; `--focus` only limits the local scan scope. `--force` rechecks the index and requests output refresh.
+
+Automatic supplementation first revisits changed evidence of accepted knowledge, then selects semantic entries from the local CodeGraph call graph. Downstream capabilities on the same call chain remain in navigation instead of triggering repeated per-file AI questions; independent entries that the graph cannot explain still need analysis. Only when several complete evidence batches remain does a compact structural pre-screen run concurrently; failures and uncertain cases retain their candidates. Deleted source evidence suppresses old knowledge during generation. Each run dynamically batches candidates by complete evidence capacity while retaining related evidence for existing knowledge. The evidence bundle is capped at 64 KiB and the final prompt at 96 KiB. Oversized evidence is deferred as an abnormal batch, never truncated or marked complete. Normal `sync` continues until all normal candidates are processed; individual Agent calls remain protected by `agent.timeout`, retry limits, and input-size checks. Unavailable AI, errors, timeouts and unresolved evidence keep their batches pending while independent batches continue, with diagnostics in `.skills-seed/runtime/local-supplement.json`. `mode` and `structural` only affect explicit semantic supplementation; the default flow has no AI agenda configuration.
+
 [简体中文](CONFIGURATION.md) | [English](CONFIGURATION.EN.md)
 
 The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates it from the project context. Most paths are relative to the project root or `.skills-seed`; each field below states the relevant base.
@@ -10,7 +32,7 @@ The config file lives at `.skills-seed/config.yaml`. `skills-seed init` creates 
 
 - Top-level `project` was renamed to `profile`. It describes the project or workspace that owns the config file; it is not the `project` run mode.
 - `workspace` now keeps only `projects`; user-written `shared`, `contracts`, and `infra` fields were removed.
-- Workspace shared libraries, contracts, and infrastructure impact are analyzed into workspace profile/spec during `learn current` from repository evidence, child project profiles, and one-shot user context. They are not read from config, and generation only consumes learned artifacts.
+- Workspace shared libraries, contracts, and infrastructure routing come from explicit project configuration and local CodeGraph facts; no extra AI profile call guesses them, and generation only consumes saved artifacts.
 - Workspace root `profile.language` is empty by default because a workspace can contain child projects in multiple languages.
 - `analysis.codegraph` was removed. Structural context and symbol verification are now configured through `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when CodeGraph is unavailable.
 
@@ -53,7 +75,6 @@ learning:
       min_confidence: 0.75
       min_single_evidence_confidence: 0.85
     agenda:
-      fallback_paths_per_focus: 256
     structural:
       enabled: true
       provider: "auto"
@@ -67,6 +88,7 @@ skills:
     codex: ".agents/skills/<project-name>-dev"
 
 logging:
+  enabled: false
   level: "DEBUG"
   logs_path: "runtime/logs"
   max_log_files: 30
@@ -165,8 +187,7 @@ exclude:
 | Field | Default | Description |
 |---|---:|---|
 | `mode` | `normal` | All learning strategies use high-precision admission: `fast` narrows evidence exploration; `normal` is the default; `deep` broadens evidence exploration without lowering the pattern admission standard |
-| `agenda.fallback_paths_per_focus` | `256` | Maximum input paths in each deterministic fallback focus when AI leaves paths unassigned; controls request size and resumability, not path value |
-| `structural.enabled` | `true` | Enable structural context; even when enabled, it only runs when focus, diff, sample, or entry files are available |
+| `structural.enabled` | `true` | Enable structural context; it runs only when focus, source sample, or entry files are available |
 | `structural.provider` | `auto` | Structural context and symbol-verification source: `auto` prefers CodeGraph and falls back to tree-sitter when unavailable; `codegraph` requires CodeGraph; `treesitter` explicitly selects the embedded parser |
 | `structural.max_symbols` | `30` | Maximum symbols emitted into structural context |
 | `structural.max_file_size` | `512` | Per-source-file size limit in KB; larger files are skipped |
@@ -179,9 +200,9 @@ Starting in 0.7.1, structural pre-scan, `learn current`, and `preview` share the
 
 Starting in 0.9.0, project-structure summaries, sample-file collection, and structural pre-scan all use the same configured file-filtering policy. Except for built-in safety boundaries such as `.git`, `.skills-seed`, and configured generated-skills output directories, analyzer no longer keeps extra directory-name keywords. Put dependency, build-output, or project-specific directories in `exclude` when they should be skipped.
 
-The current version keeps every in-scope candidate after local file filtering; no path vocabulary or model guess narrows source candidates before planning. Large inputs such as candidate paths, diffs, focused files, and structural context are written into runtime input files and referenced by prompts.
+The current version keeps every in-scope candidate after local file filtering; no path vocabulary or model guess narrows source candidates before planning. Large inputs such as candidate paths, focused files, and structural context are written into runtime input files and referenced by prompts.
 
-Starting in 0.9.11, file filtering also applies Git ignore rules by default. Starting in 0.9.12, the Git ignore switch lives at `exclude.gitignore`. Set it to `false` when files ignored by `.gitignore` should still be analyzed. Starting in 0.9.13, snapshots still preserve the full current state, but diffs sent to AI are filtered by `exclude.paths` and `exclude.gitignore`, preventing ignored files from entering analysis as deleted diffs.
+File filtering applies Git ignore rules by default; set `exclude.gitignore` to `false` to analyze ignored files. Persistent file fingerprints determine incremental status without storing source snapshots. AI compares current source evidence with stored knowledge for semantic changes. Opening an existing project removes the obsolete `.skills-seed/cache/snapshots/` directory.
 
 #### Recommendations
 
@@ -202,13 +223,13 @@ Starting in 0.11.0, `learning.current.mode` can be set to `fast`, `normal`, or `
 
 Evidence focuses have no configurable classification. Planning derives the minimum evidence set needed to validate a future development decision from source responsibilities, capabilities, resource actions, state transitions, contracts, integrations, and cross-cutting mechanisms. A focus exists only for the current evidence pass; it is not a Workflow, work procedure, or fixed generated-Skill taxonomy. Model-output parsing also repairs evidence line range expressions, normalizing invalid JSON such as `"line": 29-43` to a single line number.
 
-In the current version, every evidence focus uses an independent analysis call to avoid cross-focus conclusion bleed; analysis concurrency is controlled only by `agent.parallelism`. Independent knowledge review keeps each complete evidence focus together and processes agenda focuses serially, checkpointing immediately after each focus. Only after every focus is reviewed do candidates enter one global cross-focus normalization pass. If a delta candidate fails local evidence admission and no other decision is admitted for that focus, the focus is reduced to exactly one `no_change` receipt, distinguishing “analyzed with no admissible Pattern” from “omitted by the Agent.” Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
+The default flow groups related evidence into one bounded analysis call and independently reviews only business candidates. Once an analysis result is checkpointed, its independent review can overlap analysis or review of another batch. Checkpoints for one run are committed serially. If a delta candidate fails local evidence admission and no other decision is admitted for that focus, the focus is reduced to exactly one `no_change` receipt, distinguishing “analyzed with no admissible Pattern” from “omitted by the Agent.” Generated skills also keep low-frequency or local evidence out of the strong-constraint layer, so incidental examples are not rendered as mandatory project standards.
 
 In independent review, a complete `business_method` sets or replaces a capability entry, while omission removes it; no redundant verdict field duplicates the object's state. The review Agent must open the exact definition directly called or referenced by candidate evidence and record its full declaration, project-relative location, prerequisites, and result/error semantics. Local code validates only the structured contract and path safety; it does not substitute caller/definition file equality for semantic review.
 
-Candidate preparation only applies scope, exclusion rules, and path normalization. It does not infer knowledge value from filenames, directories, languages, or framework vocabulary. Every in-scope candidate enters agenda planning, whose focuses and reasoned skip receipts must cover every input path. Source analysis and independent knowledge review own semantic judgment; local code validates evidence, scope, structured contracts, and complete coverage.
+Candidate preparation applies scope, exclusion rules, and path normalization. Local CodeGraph facts select important business gaps; AI receives only bounded evidence batches. Source analysis and independent review own semantic judgment; local code validates evidence, scope, and structured contracts.
 
-The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary project configs use it for current-code evidence-focus concurrency. `learn current` uses independent runtime calls: after candidate preparation, planning creates evidence packs and each evidence focus is analyzed in its own call. `learning.current.pattern_admission` controls the confidence required for a candidate to enter the merge and storage flow.
+The interactive init prompt writes total Agent parallelism into `agent.parallelism`. Workspace root configs use it for child-project concurrency; ordinary projects share the same Agent concurrency budget with nested calls. Related evidence is analyzed together until the bounded prompt is full. `learning.current.pattern_admission` controls the confidence required for a candidate to enter the merge and storage flow.
 
 Starting in 0.8.0, Agent outputs are saved separately under `.skills-seed/runtime/agent-outputs/` by default, including final content, raw CLI output, stderr, and a manifest. Runtime logs keep only lengths and archive paths, and no longer include model reply previews or raw stdout/stderr. Starting in 0.10.3, valid JSON final content is formatted as a readable fenced `json` block inside the `.md` archive.
 
@@ -235,7 +256,7 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 | `timeout` | `1800` | Total budget in seconds for one Agent stage, including queueing, execution, backoff, and result repair; retries do not reset the deadline |
 | `max_turns` | `80` | Maximum exploration turns for one Agent call; stops at the limit to bound context growth; currently used by Claude CLI |
 | `allow_user_plugins` | `false` | Whether agents may load user plugins; disabled by default for stable batch runs |
-| `parallelism` | `0` | Agent concurrency limit; workspace roots cap both child tasks and shared Agent calls. Child settings cannot enlarge the shared budget. Analysis and serial knowledge review share slots; `0` means automatic |
+| `parallelism` | `0` | Agent concurrency limit; workspace roots cap both child tasks and shared Agent calls. Child settings cannot enlarge the shared budget. Analysis and independent review share slots; in project mode `0` uses local CPU capacity, capped at six concurrent calls |
 | `model` | empty | Model name passed to the Agent CLI for skills-seed calls; empty passes no model flag and inherits the local Agent CLI default |
 | `retry.max_retries` | `3` | Maximum retry attempts for retryable errors; `0` uses the default `3` |
 | `retry.initial_interval` | `15` | Initial retry wait in seconds; `0` uses the default `15` |
@@ -245,10 +266,10 @@ The skills-seed generated footer in Skills templates is now controlled by an int
 
 #### `parallelism` Notes
 
-1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently. Each batch uses its own runtime call, then results are merged and checkpointed in agenda order.
+1. In `project` mode, `agent.parallelism > 1` lets `learn current` analyze independent evidence-focus batches concurrently and overlap review of saved results with other batches. Results are checkpointed individually by the main flow; final knowledge follows agenda order.
 2. In `workspace` mode, automatic parallelism is the child project count, capped at `6`.
 3. A positive value is used as the explicit concurrency limit.
-4. Workspace children run through a goroutine worker pool. Each child controls focus scheduling, but all actual Agent calls share the root budget, and knowledge-review calls remain serial across children.
+4. Workspace children run through a goroutine worker pool. Each child controls focus scheduling, but all actual Agent calls share the root budget. Independent analysis and review may overlap; checkpoints for one run are still committed serially.
 
 #### `retry` Notes
 
@@ -298,15 +319,14 @@ When skills are generated, workflows are written to output `workflows/`, and mat
 
 ### `.skills-seed` Layout
 
-`.skills-seed/store/` is persistent data and should not be deleted. `.skills-seed/cache/` is rebuildable cache. `.skills-seed/runtime/` contains logs, rendered prompts, Agent outputs, and temporary inputs; it can be deleted when you do not need troubleshooting artifacts.
+`.skills-seed/store/` is persistent data and should not be deleted. `.skills-seed/cache/` holds resumable command state. `.skills-seed/runtime/` contains optional file logs, rendered prompts, Agent outputs, and temporary inputs; it can be deleted when you do not need troubleshooting artifacts. Initialization does not pre-create `runtime/`. Prompt input directories are created only when input files are written, so inline inputs leave no empty directories. Disabling file logging affects `runtime/logs/`; other runtime artifacts are still written when needed.
 
 | Path | Purpose |
 |---|---|
 | `.skills-seed/store/project.db` | Indexed data such as patterns, quality metrics, and file fingerprints |
 | `.skills-seed/store/documents/` | Readable JSON documents such as profiles, specs, state, and changelog |
-| `.skills-seed/cache/snapshots/` | Rebuildable file snapshot cache |
 | `.skills-seed/cache/commands/<command>/state.json` | Resumable state for unfinished commands, including evidence-focus results not yet stored; cleared after persistence and safe to delete for a fresh detection and agenda |
-| `.skills-seed/runtime/logs/` | Runtime logs |
+| `.skills-seed/runtime/logs/` | File logs written only with `logging.enabled: true` |
 | `.skills-seed/runtime/rendered-prompts/` | Rendered prompts and manifests |
 | `.skills-seed/runtime/agent-outputs/` | Archived Agent outputs |
 
@@ -363,6 +383,7 @@ Runtime AI prompt templates are maintained as English-only source templates. The
 
 | Field | Default | Description |
 |---|---:|---|
+| `enabled` | `false` | Write runtime log files; terminal output, run records, and checkpoints still work when disabled |
 | `level` | `DEBUG` | Log level: `DEBUG`, `INFO`, `WARN`, or `ERROR` |
 | `logs_path` | `runtime/logs` | Log directory relative to `.skills-seed` |
 | `max_log_files` | `30` | Maximum retained log files; older files are cleaned up automatically |

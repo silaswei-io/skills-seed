@@ -314,7 +314,6 @@ func localizedKnowledgeResources(resources []string) []string {
 		"workspace-profile":      "ResetKnowledgeResourceWorkspaceProfile",
 		"workspace-spec":         "ResetKnowledgeResourceWorkspaceSpec",
 		"child-project-profiles": "ResetKnowledgeResourceChildProjectProfiles",
-		"file-snapshots":         "ResetKnowledgeResourceFileSnapshots",
 		"command-checkpoints":    "ResetKnowledgeResourceCommandCheckpoints",
 		"learning-history":       "ResetKnowledgeResourceLearningHistory",
 	}
@@ -459,7 +458,6 @@ func createInitSeedDirectories(seedPath string) (bool, error) {
 		seedPath,
 		seedLayout.StoreDocuments(),
 		seedLayout.Cache(),
-		seedLayout.Runtime(),
 	}
 
 	seedCreated := false
@@ -493,7 +491,7 @@ func syncInitLocale(configRepo *config.Repository, locale string) error {
 }
 
 func startInitLogger(seedPath string, configRepo *config.Repository, enabled bool) (func(), error) {
-	if !enabled {
+	if !enabled || !configRepo.GetLoggingConfig().Enabled {
 		return func() {}, nil
 	}
 	loggingConfig := configRepo.GetLoggingConfig()

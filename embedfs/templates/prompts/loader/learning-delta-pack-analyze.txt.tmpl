@@ -1,117 +1,51 @@
-# Analyze Diff Learning Pack
+# Review Current Source Knowledge
 
-This is an isolated diff-pack analysis runtime call. Classify reusable knowledge changes caused by the listed diffs only, refine the pack-local decision internally, and return final knowledge-change decisions.
+Review the listed source paths against the related stored Patterns. Return one knowledge-change decision for each focus ID. The file tracker selected these paths as changed or removed; no previous source snapshot or textual diff is available. Decide from current source, CodeGraph structure, and the listed existing knowledge. Do not infer the old implementation from memory.
 
-Project:
-- name: {{.ProjectName}}
-- path: {{.RootPath}}
-- language: {{.Language}}
-- learning mode: {{.LearningMode}}
-- change profile: {{if .ChangeProfile}}{{.ChangeProfile}}{{else}}incremental{{end}}
-- allowed categories: {{.AllowedCategories}}
+Project: {{.ProjectName}}
+Root: {{.RootPath}}
+Language: {{.Language}}
+Learning mode: {{.LearningMode}}
+Allowed categories: {{.AllowedCategories}}
 
-Learning strategy guidance:
-- `fast`: reduce exploration cost while returning only clear decision-bearing changes.
-- `normal`: use the default high-precision admission bar.
-- `deep`: inspect more connected evidence before deciding; it does not lower the admission bar or retain weak local changes.
-- The mode changes exploration breadth only. It is not a fixed output count, file budget, or permission to learn outside the diff boundary.
-- Interpret category names abstractly across project types: `business` means product/domain behavior, `api` means any interface or contract, `database` means state/storage/persistence, `middleware` means interception or pipeline behavior, and `utils` means reusable domain-neutral helpers.
-{{- if .StructurePath}}
-
-Focused structure is available at `{{.StructurePath}}`; use it only around changed paths.
-{{- end}}
 {{- if .SharedContextPath}}
-Shared planning context is available at `{{.SharedContextPath}}`; read it as the run baseline before inspecting diff evidence.
+Shared planning context: `{{.SharedContextPath}}`
 {{- end}}
 {{- if .StructuralContextPath}}
-Structural context is available at `{{.StructuralContextPath}}`; use only direct symbols, callers, callees, imports, and ownership clues connected to changed files.
+Structural context: `{{.StructuralContextPath}}`
 {{- end}}
 {{- if .UserContextPath}}
-User context is available at `{{.UserContextPath}}`; it is not source evidence.
+User context: `{{.UserContextPath}}` (routing guidance, not source evidence)
 {{- end}}
 
-Diff evidence packs:
+Evidence focuses:
 {{range .Focuses}}
-## {{.EvidenceFocus.Name}}{{if .EvidenceFocus.ID}} (`{{.EvidenceFocus.ID}}`){{end}}
-{{- if .EvidenceFocus.RouteTerms}}
-- route terms: {{range .EvidenceFocus.RouteTerms}}`{{.}}` {{end}}
-{{- end}}
+## {{.EvidenceFocus.Name}} (`{{.EvidenceFocus.ID}}`)
 - analysis depth: `{{.EvidenceFocus.EffectiveAnalysisDepth}}`
-{{- if .EvidenceFocus.Attributes}}
-- attributes: {{range .EvidenceFocus.Attributes}}`{{.}}` {{end}}
-{{- end}}
-{{- if .EvidenceFocus.RiskSignals}}
-- risk signals: {{range .EvidenceFocus.RiskSignals}}`{{.}}` {{end}}
-{{- end}}
 {{- if .FocusPaths}}
-- changed focus paths:
+- changed or removed paths:
 {{range .FocusPaths}}  - {{.}}
-{{end}}
-{{- end}}
-{{- if .DiffFiles}}
-- changed diffs:
-{{range .DiffFiles}}  - {{.Path}} -> {{.DiffPath}}
-{{end}}
-{{- end}}
+{{end}}{{end}}
 {{- if .ContextFiles}}
-- context files:
+- current source files:
 {{range .ContextFiles}}  - {{.Path}}
-{{end}}
-{{- end}}
+{{end}}{{end}}
 {{- if .RelatedPatterns}}
-- related existing patterns:
+- related stored Patterns:
 {{range .RelatedPatterns}}  - id: `{{.ID}}`; source: `{{.Source}}`; name: {{.Name}}; category: `{{.Category}}`; scope: `{{.ScopePath}}`
     rule: {{.Rule}}
+{{end}}{{end}}
 {{end}}
-{{- end}}
-{{end}}
 
-Diff boundary:
-- An evidence focus is only an internal grouping of changed source. It is not a work procedure, a user-maintained Workflow, or development instructions. Report source-backed knowledge changes, not steps for future work.
-- Do not rely on hidden context from planning, previous full learning, other packs, authority extraction, project-map refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
-- Every decision must be triggered by a listed diff or changed focus path.
-- Changed hunks are the source anchor. Unchanged context files can explain meaning but cannot independently create a new pattern.
-- Use only tools explicitly available in this invocation. Do not attempt unavailable or denied tools, and do not retry a denied tool call.
-- Stop exploration once the listed diff evidence is sufficient to decide. If the evidence boundary cannot establish a change, return `no_change` for that pack instead of expanding the search.
-- `focus_action: "new"` means the diff revealed a new reusable boundary inside a listed pack; it does not authorize scanning beyond listed diffs and direct context.
-- Prefer `update` or `reinforce` when the diff fits a related existing pattern.
-- For `careful` focuses, verify the changed state/contract/generated/cross-module boundary. For `critical` focuses, also verify changed guards, cleanup and lifecycle handling, return/error checks, authorization or privilege boundaries, and external effects wherever applicable. Depth increases scrutiny, not output count.
-- Use `retire` only when a diff anchor proves that an entire listed related pattern is no longer true. Set its exact listed `pattern_id`, omit `proposal`, and never retire `user_defined` or `default` patterns.
-- Use `add` only for a new reusable project-specific decision caused or revealed by the diff: product/domain behavior, UI or command action, reusable source entry, code convention, language/runtime usage, framework integration shape, lifecycle transition, authorization rule, audit rule, configuration gate, external dependency contract, integration boundary, correctness constraint, or operational safeguard.
-- Treat changed destructive, irreversible, privileged, environment-mutating, or externally visible product operations as high-risk knowledge. If the diff changes cleanup/destroy/reset actions, state/resource/data deletion, credential/secret/certificate behavior, external-system lifecycle operations, permission changes, or migration/bootstrap safeguards, add or update a scoped safety boundary rather than hiding it as local implementation detail.
-- For every proposal, return the complete `knowledge_flags` array. Use `["operational_risk"]` only when the changed evidence proves the proposal itself involves irreversible, privileged, state/resource-changing, or externally visible behavior. A critical focus, risk signal, filename, vocabulary, or sensitive subject alone does not justify the flag. Return `[]` otherwise and never invent another flag.
-- Return `no_change` for testing, deployment, release, or acceptance files, commands, procedures, or ordering. User-maintained Workflows own that knowledge.
-- Use `no_change` for pure implementation movement, formatting, trivial CRUD, repeated known behavior, or context-only observations. Do not confuse a pure or stateless decision-bearing calculation with implementation movement: changed selection, ranking, precedence, min/max choice, caps, rounding, fallback/base choice, aggregation, eligibility, or boundary comparisons can require durable knowledge.
-- If evidence is insufficient to prove a reusable change, return `no_change` for that pack rather than speculating.
-- Return exactly one knowledge-change decision for every input focus ID in this pack, including `no_change` decisions when the diff does not establish a reusable change.
-
-Pack-local decision quality:
-- Compare the diff against related existing patterns before adding a new proposal.
-- Add or update knowledge only when the changed hunk proves a specific future implementation, navigation, safety, or maintenance decision and identifies the boundary or source entry that decision needs. A changed line alone is not enough.
-- If the change is similar to an existing pattern, produce an update/reinforce decision with the existing semantic boundary instead of creating a duplicate.
-- When an add/update/reinforce proposal has a directly changed or verified reusable capability entry and its complete contract is available from the listed evidence, filling `proposal.business_method` with the real name, current location, complete signature or concrete declaration, prerequisites, and return/error/result semantics is required. Leave it null only when the diff changes data, configuration, prose, a non-reusable helper, or evidence cannot establish a required contract field.
-- When one canonical entry owns the changed correctness boundary, keep its proposal complete across guards, idempotent reuse or conflict checks, selected/calculated results, external effects, persistence ordering, partial results, and post-effect uncertainty wherever the listed evidence proves them. Do not scatter one entry's essential contract into unrelated proposals merely because its branches have different categories.
-- Preserve changed decision-bearing calculations exactly enough for future work: include the operands, comparison or precedence rule, fallback/base selection, and boundary condition when the diff changes limits, eligibility, time windows, state transitions, retries, partial results, or external effects. Do not reduce a changed formula or ordering rule to a generic outcome summary.
-- When the diff changes an emitted message, event, command, request, or equivalent external payload, preserve its concrete operation or payload identity and its ordering relative to state changes.
-- When changed evidence shows that earlier progress or effects survive a later failure without compensation or rollback, state that absence explicitly with the returned partial result or observable state; never imply atomicity.
-- Set `proposal.scope_path` only when the changed evidence establishes a stable repository ownership boundary useful for future routing. Do not derive it mechanically from a single evidence filename or a generic containing directory; leave it empty when ownership is uncertain.
-- Do not infer a new language, framework, architecture, or domain inventory from a partial diff. Keep only the project-specific change that the diff directly alters or reveals.
-- Do not generalize behavior from one lifecycle action to sibling actions unless the changed hunk proves the same invariant.
-- Prefer `no_change` whenever the decision value, novelty, or applicability boundary is uncertain. Do not use low confidence to retain a weak proposal.
-- Treat destructive setup or migration changes conservatively: unless the diff and authoritative project evidence say the behavior is a production rule, record it only as a bounded observation or `no_change`.
-- Do not turn dangerous behavior into a recommendation to perform it. If kept, wording must require inspecting the verified entry and preserving safeguards, prompts, environment checks, rollback expectations, or documented boundaries shown by the diff.
-- If the diff touches security-sensitive handling, describe only the observed boundary and required source inspection. Do not claim a mitigation unless the diff proves it; decoding or unescaping input is not automatically XSS, injection, or authorization protection.
-- Do not introduce exact counts, totals, exclusions, enum cardinalities, or supported variant numbers from a partial diff unless the changed hunk contains the complete closed list and the number changes a future implementation decision.
-
-Pre-output validation:
-- Every diff pack receives a decision.
-- Every decision must set `focus_id` to the exact input focus ID printed in that diff pack header, including `no_change` decisions.
-- Every proposal has at least one changed-hunk anchor.
-- No decision references files outside the listed changed paths or context files.
-- No proposal duplicates a related existing pattern under a new ID.
-- Every proposal has `knowledge_flags` consistent with the changed evidence; an update or reinforce proposal does not inherit or remove a flag without evidence for the resulting boundary.
-- Every verified routeable entry that owns a retained proposal carries its complete `business_method` when the listed evidence establishes all required contract fields.
-- Output only source-backed semantic changes; do not invent repository-wide rules, statistics, or unsupported security properties.
+Decision rules:
+- Treat each focus as a source group, not a work procedure. Use only listed paths and direct structural context. Follow available tool permissions; do not retry denied tools.
+- Inspect current source for each existing Pattern's behavior and applicability. Use `update` or `reinforce` when its boundary still applies but current evidence improves or changes it; use `no_change` when nothing durable changes.
+- Use `retire` only when the complete existing Pattern is disproved by current source or its owning source was removed and no live implementation supports it. Set the exact related `pattern_id`, omit `proposal`, and never retire `user_defined` or `default` Patterns.
+- Use `add` only for a distinct, reusable repository-specific decision that current source proves: domain behavior, capability entry, interface or persistence contract, lifecycle, integration, authorization, calculation, or operational safeguard. Do not add routine implementation movement, tests, release steps, or duplicates of related Patterns.
+- Every add, update, reinforce, or retire decision needs a source anchor whose `path` is a listed changed or removed path. Set `change_kind` to `present` for existing source or `deleted` for removed source. Describe the current symbol or behavior; for a removed path describe the absence. Do not claim an exact changed line or hunk.
+- For a retained capability, include the actual `business_method` name, current location, declaration, prerequisites, result/error semantics and partial effects when current evidence proves them. Preserve meaningful guards, ordering, fallback and state transitions.
+- Return `knowledge_flags: ["operational_risk"]` only for proven irreversible, privileged, state-changing or externally visible behavior; otherwise return `[]`.
+- When evidence cannot support a durable decision, return `no_change`. Do not fill gaps by guessing from a former source version.
 
 Return JSON only.
 

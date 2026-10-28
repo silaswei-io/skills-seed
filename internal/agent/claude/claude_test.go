@@ -69,6 +69,7 @@ func TestClaudePrintArgsPromptOnlyDisablesRepositoryTools(t *testing.T) {
 
 	require.Contains(t, args, "--tools")
 	require.Empty(t, requireArgValue(t, args, "--tools"))
+	require.Equal(t, "low", requireArgValue(t, args, "--effort"))
 }
 
 func TestClaudePrintArgsForConversationResumesWithoutDisablingPersistence(t *testing.T) {

@@ -22,7 +22,6 @@ type GenerateOptions struct {
 
 type generationSummary struct {
 	CategorySummaries map[string]categorySummary
-	KeyInsights       []string
 }
 
 type categorySummary struct {
@@ -38,19 +37,16 @@ type skillTemplateData struct {
 	SkillName           string
 	SkillDescription    string
 	Language            string
+	HasNavigation       bool
 	HasKnowledge        bool
 	HasPatterns         bool
 	PatternCount        int
-	Categories          int
 	LastUpdated         string
-	KeyInsights         []string
 	References          ReferenceAvailability
 	OverviewReferences  []skills.ReferenceItem
 	ReferenceGroups     []skills.ReferenceGroup
-	DevelopmentFocuses  []developmentFocusView
 	WorkflowReferences  []WorkflowReference
 	RuleReferences      []RuleReference
-	StateSummaries      []string
 	CommandRules        []domain.EngineeringRule
 }
 
@@ -66,23 +62,18 @@ type categoryPatternTemplateData struct {
 }
 
 type businessIndexTemplateData struct {
-	Category          string
-	Summary           string
 	PatternCount      int
 	LastUpdated       string
-	DetailGroups      []patternGroup
-	InlineGroups      []patternGroup
+	Groups            []businessResponsibilityGroup
+	Singles           []patternRenderModel
 	RelatedReferences []PatternReferenceLink
 }
 
 type businessDetailTemplateData struct {
 	Category          string
 	GroupTitle        string
-	GroupSummary      knowledge.BusinessGroupSummary
 	PatternObjects    []patternRenderModel
-	PatternCount      int
 	LastUpdated       string
-	CodeFenceLanguage string
 	RelatedReferences []PatternReferenceLink
 }
 
@@ -96,7 +87,6 @@ type projectOverviewTemplateData struct {
 type profileReferenceTemplateData struct {
 	domain.ProjectProfile
 	HasBusinessPatterns bool
-	HasUtilityPatterns  bool
 	CodeFenceLanguage   string
 	BusinessMethodIndex businessMethodIndex
 }
@@ -110,6 +100,7 @@ type projectSpecTemplateData struct {
 	domain.ProjectSpec
 	References     ReferenceAvailability
 	RuleReferences []RuleReference
+	AuthorityPaths []string // 必须按实际适用范围读取的权威原文，不代表已提取或复核其内容。
 }
 
 type categoryReferenceMeta struct {
@@ -128,15 +119,11 @@ type patternRenderModel struct {
 	domain.Pattern
 	HardConstraint      bool
 	HighRiskOperational bool
+	ReferencePath       string
 }
 
 func (p patternRenderModel) AllowsHardConstraint() bool {
 	return p.HardConstraint
-}
-
-type patternGroup struct {
-	knowledge.BusinessGroup
-	Patterns []patternRenderModel
 }
 
 type ReferenceAvailability struct {
@@ -145,7 +132,6 @@ type ReferenceAvailability struct {
 	ProjectOverview  bool
 	BusinessMethods  bool
 	KeyModules       bool
-	CommonUtils      bool
 	BusinessPatterns bool
 }
 

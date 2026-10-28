@@ -9,9 +9,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
+	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
@@ -213,11 +215,11 @@ func TestSubcommandHelpKeepsDetailedContent(t *testing.T) {
 	require.NoError(t, rootCmd.Execute())
 
 	helpText := out.String()
-	require.Contains(t, helpText, "准备候选并规划学习议程")
-	require.Contains(t, helpText, "隔离分析源码证据并独立审查知识")
-	require.Contains(t, helpText, "按策略提取权威规则并刷新")
+	require.Contains(t, helpText, "本地建立或更新 CodeGraph 索引")
+	require.Contains(t, helpText, "按调用关系、证据容量和业务重要性动态组批")
+	require.Contains(t, helpText, "只在本地无法判断业务决策时调用 AI")
 	require.Contains(t, helpText, "Examples:")
-	require.Contains(t, helpText, "skills-seed learn current --focus internal/service --profile skip")
+	require.Contains(t, helpText, "skills-seed learn current --focus internal/service")
 	require.Contains(t, helpText, "--context string")
 }
 
@@ -373,6 +375,29 @@ func TestInitContainerAndLoggerDoesNotOpenPatternDBEagerly(t *testing.T) {
 	_, err = cont.PatternRepo.Count(context.Background())
 	require.NoError(t, err)
 	require.NoError(t, cont.PatternRepo.Close())
+}
+
+func TestInitLoggerWritesFilesOnlyWhenEnabled(t *testing.T) {
+	oldArgs := os.Args
+	os.Args = []string{"skills-seed", "sync"}
+	defer func() { os.Args = oldArgs }()
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	configRepo, err := config.NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	cont := &container.Container{ConfigRepo: configRepo}
+	logDir := filepath.Join(seedPath, "runtime", "logs")
+
+	require.NoError(t, initLogger(seedPath, cont))
+	require.Empty(t, logger.CurrentLogPath())
+	require.NoDirExists(t, logDir)
+
+	cfg := configRepo.Get()
+	cfg.Logging.Enabled = true
+	require.NoError(t, configRepo.Update(cfg))
+	require.NoError(t, initLogger(seedPath, cont))
+	require.FileExists(t, logger.CurrentLogPath())
+	require.NoError(t, logger.Close())
+	require.Empty(t, logger.CurrentLogPath())
 }
 
 func requireHelpText(t *testing.T, fieldName, commandName, value string) {

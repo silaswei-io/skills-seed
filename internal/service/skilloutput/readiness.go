@@ -169,7 +169,11 @@ func isEmbeddedSourceExpressionLink(node markdownast.Node, source []byte) bool {
 	if len(index) >= 2 && index[0] == '\'' && index[len(index)-1] == '\'' {
 		index = strconv.Quote(index[1 : len(index)-1])
 	}
-	candidate := "value[" + index + "](" + string(link.Destination) + ")"
+	argument := string(link.Destination)
+	if argument == "..." {
+		argument = "placeholder"
+	}
+	candidate := "value[" + index + "](" + argument + ")"
 	_, err := parser.ParseExpr(candidate)
 	return err == nil
 }

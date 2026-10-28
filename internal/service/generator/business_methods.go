@@ -24,8 +24,35 @@ type businessMethodGroup struct {
 
 type businessMethodView struct {
 	domain.BusinessMethod
-	DisplayName string
-	Module      string
+	DisplayName   string
+	Module        string
+	ReferencePath string
+}
+
+// reviewedBusinessMethods 将有效模式中的能力入口并入索引，优先采用当前证据审查结果。
+func reviewedBusinessMethods(profileMethods []domain.BusinessMethod, patterns []domain.Pattern) []domain.BusinessMethod {
+	methods := make([]domain.BusinessMethod, 0, len(profileMethods)+len(patterns))
+	seen := make(map[string]bool)
+	add := func(method domain.BusinessMethod) {
+		if !domain.IsRouteableBusinessMethod(method) || !domain.IsUsableBusinessMethod(&method) {
+			return
+		}
+		key := strings.ToLower(strings.TrimSpace(method.DisplayLocation()) + "\x00" + strings.TrimSpace(method.Name))
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		methods = append(methods, method)
+	}
+	for _, pattern := range patterns {
+		if pattern.BusinessMethod != nil {
+			add(*pattern.BusinessMethod)
+		}
+	}
+	for _, method := range profileMethods {
+		add(method)
+	}
+	return methods
 }
 
 func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) businessMethodIndex {
@@ -53,6 +80,7 @@ func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) bu
 			BusinessMethod: method,
 			DisplayName:    strings.TrimSpace(method.Name),
 			Module:         module,
+			ReferencePath:  "./business-methods/" + businessMethodDetailName(method),
 		})
 	}
 
@@ -80,11 +108,15 @@ func buildBusinessMethodIndex(methods []domain.BusinessMethod, locale string) bu
 	return index
 }
 
+func businessMethodDetailName(method domain.BusinessMethod) string {
+	return referenceFileID(method.DisplayLocation()+"\x00"+method.Function+"\x00"+method.Name) + ".md"
+}
+
 func businessMethodGroupTitle(module, locale string) string {
 	if module == "" || module == "project" {
 		return generatorText(locale, "GeneratorBusinessMethodProjectGroupTitle")
 	}
-	words := knowledge.SplitBusinessGroupWords(module)
+	words := knowledge.SplitIdentifierWords(module)
 	if len(words) == 0 {
 		return module
 	}

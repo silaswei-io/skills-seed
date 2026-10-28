@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -140,7 +141,20 @@ func (r *learnCurrentProjectRun) relatedPatternsByFocus(ctx context.Context, foc
 	}
 	for _, focus := range focuses {
 		focusPaths := relativeEvidenceFocusPaths(r.projectRoot, focus.FocusAbsPaths)
-		out[focus.EvidenceFocus.ID] = selectRelatedDeltaPatterns(focus.EvidenceFocus, focusPaths, patterns)
+		if agent.CurrentLearningSupplement(ctx) != nil {
+			var exact []domain.Pattern
+			for _, pattern := range patterns {
+				for _, evidence := range pattern.EvidenceLocations {
+					if slices.Contains(focusPaths, evidence.Path) {
+						exact = append(exact, pattern)
+						break
+					}
+				}
+			}
+			out[focus.EvidenceFocus.ID] = exact
+		} else {
+			out[focus.EvidenceFocus.ID] = selectRelatedDeltaPatterns(focus.EvidenceFocus, focusPaths, patterns)
+		}
 	}
 	return out, nil
 }

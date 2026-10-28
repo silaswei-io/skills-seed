@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,16 +12,14 @@ import (
 // PromptInputSession 管理单次 Agent 调用的临时提示词输入文件。
 type PromptInputSession struct {
 	dir           string
+	baseDir       string
+	prefix        string
 	keepOnCleanup bool
 }
 
-// NewPromptInputSession 创建临时提示词输入文件会话。
+// NewPromptInputSession 准备临时提示词输入文件会话，首次写入时才创建目录。
 func NewPromptInputSession(prefix string) (*PromptInputSession, error) {
-	dir, err := os.MkdirTemp("", strings.TrimSpace(prefix)+"-*")
-	if err != nil {
-		return nil, err
-	}
-	return &PromptInputSession{dir: dir}, nil
+	return &PromptInputSession{prefix: prefix}, nil
 }
 
 func newPromptInputSessionIn(baseDir, prefix string) (*PromptInputSession, error) {
@@ -28,17 +27,10 @@ func newPromptInputSessionIn(baseDir, prefix string) (*PromptInputSession, error
 	if baseDir == "" {
 		return NewPromptInputSession(prefix)
 	}
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		return nil, err
-	}
-	dir, err := os.MkdirTemp(baseDir, runtimefiles.TempPattern("prompt-input", prefix))
-	if err != nil {
-		return nil, err
-	}
-	return &PromptInputSession{dir: dir, keepOnCleanup: true}, nil
+	return &PromptInputSession{baseDir: baseDir, prefix: prefix, keepOnCleanup: true}, nil
 }
 
-// Cleanup 删除所有临时提示词输入文件。
+// Cleanup 删除系统临时输入；项目 runtime 中的实际输入文件保留用于排障。
 func (s *PromptInputSession) Cleanup() {
 	if s == nil || s.dir == "" {
 		return
@@ -51,12 +43,41 @@ func (s *PromptInputSession) Cleanup() {
 
 // Write 将非空内容写入会话目录并返回文件路径。
 func (s *PromptInputSession) Write(name, content string) (string, error) {
-	if s == nil || s.dir == "" || strings.TrimSpace(content) == "" {
+	if s == nil || strings.TrimSpace(content) == "" {
 		return "", nil
+	}
+	createdDir := false
+	createdBase := false
+	if s.dir == "" {
+		var err error
+		if s.baseDir == "" {
+			s.dir, err = os.MkdirTemp("", strings.TrimSpace(s.prefix)+"-*")
+		} else {
+			if _, statErr := os.Stat(s.baseDir); errors.Is(statErr, os.ErrNotExist) {
+				createdBase = true
+			}
+			if err = os.MkdirAll(s.baseDir, 0755); err == nil {
+				s.dir, err = os.MkdirTemp(s.baseDir, runtimefiles.TempPattern("prompt-input", s.prefix))
+			}
+		}
+		if err != nil {
+			if createdBase {
+				_ = os.Remove(s.baseDir)
+			}
+			return "", err
+		}
+		createdDir = true
 	}
 	path := filepath.Join(s.dir, name)
 	data := strings.TrimSpace(content) + "\n"
 	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		if createdDir {
+			_ = os.RemoveAll(s.dir)
+			s.dir = ""
+			if createdBase {
+				_ = os.Remove(s.baseDir)
+			}
+		}
 		return "", err
 	}
 	return path, nil

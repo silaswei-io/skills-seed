@@ -23,7 +23,7 @@ func TestGenerateSkillsProjectsRuleFromSeedIntoSkillRoot(t *testing.T) {
 	profileRepo := &mocks.MockProjectProfileRepository{GetFn: func(context.Context) (*domain.ProjectProfile, error) {
 		return nil, profilestore.ErrProfileNotFound
 	}}
-	svc := NewGeneratorService(&mocks.MockPatternRepository{}, profileRepo, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(&mocks.MockPatternRepository{}, nil, profileRepo, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Language: "go"},
 	}, nil, ruleRepo)
 	output := t.TempDir()
@@ -52,7 +52,7 @@ func TestGenerateSkillsRejectsDuplicateLocalAndProjectedRuleID(t *testing.T) {
 	seedPath := t.TempDir()
 	ruleRepo := rulestore.NewRepository(seedPath)
 	require.NoError(t, ruleRepo.Save(domain.Rule{ID: "foundation", Name: "本地规则", Content: "遵守本地边界。"}))
-	svc := NewGeneratorService(&mocks.MockPatternRepository{}, &mocks.MockProjectProfileRepository{}, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(&mocks.MockPatternRepository{}, nil, &mocks.MockProjectProfileRepository{}, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "demo", Language: "go"},
 	}, nil, ruleRepo)
 

@@ -53,6 +53,24 @@ func TestAuditReadinessIgnoresGoGenericCall(t *testing.T) {
 	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
 }
 
+func TestAuditReadinessIgnoresSourceCallWithEllipsisPlaceholder(t *testing.T) {
+	root := t.TempDir()
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\nThe parser treats value[idx](...) as a Markdown link.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	require.NoError(t, AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}}))
+}
+
+func TestAuditReadinessStillChecksRealLinkAfterEllipsisPlaceholder(t *testing.T) {
+	root := t.TempDir()
+	content := "---\nname: demo-dev\ndescription: Demo skill\n---\n\nvalue[idx](...) and [Missing](./missing.md)\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "SKILL.md"), []byte(content), 0o644))
+
+	err := AuditReadiness(root, ReadinessRequirements{ExpectedFiles: []string{"SKILL.md"}})
+	require.ErrorContains(t, err, "broken link")
+	require.ErrorContains(t, err, "./missing.md")
+}
+
 func TestAuditReadinessIgnoresExtremeCodeLikeExpressions(t *testing.T) {
 	tests := []struct {
 		name       string

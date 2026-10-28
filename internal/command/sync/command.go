@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -20,6 +21,8 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/interactive"
+	"github.com/silaswei-io/skills-seed/internal/service/navigation"
+	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/service/syncflow"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
@@ -428,6 +431,7 @@ func syncWorkspaceProjectProgressLabel(result domain.LearnCurrentResult, outputM
 }
 
 func mergeProjectLearnSummary(total *domain.LearnCurrentSummary, project domain.LearnCurrentSummary) {
+	total.PendingFiles += project.PendingFiles
 	total.ChangedFiles += project.ChangedFiles
 	total.DeletedFiles += project.DeletedFiles
 	total.SkippedFiles += project.SkippedFiles
@@ -443,6 +447,20 @@ func syncGeneratedSkillMissing(cont *container.Container) bool {
 	projectConfig := cont.ConfigRepo.GetProjectConfig()
 	if projectConfig.Mode == domain.ModeWorkspace {
 		return syncWorkspaceGeneratedSkillMissing(cont)
+	}
+	{
+		hash, err := navigation.Hash(projectConfig.RootPath)
+		if err != nil {
+			return true
+		}
+		data, err := os.ReadFile(skilloutput.RuntimeManifestPath(cont.SeedPath, cont.ConfigRepo.GetEffectiveSkillsTarget()))
+		if err != nil {
+			return true
+		}
+		var manifest skilloutput.Manifest
+		if json.Unmarshal(data, &manifest) != nil || manifest.NavigationHash != hash {
+			return true
+		}
 	}
 	outputPath := strings.TrimSpace(cont.ConfigRepo.GetEffectiveSkillsPath())
 	return syncSkillOutputMissing(projectConfig.RootPath, outputPath)

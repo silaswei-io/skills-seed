@@ -95,7 +95,7 @@ func preserveReviewedSingletons(result *proposal, candidates, existing []domain.
 }
 
 func (s *Service) normalizeCurrentWithAI(ctx context.Context, req NormalizeRequest, candidates []domain.Pattern, retrieved retrievalResult, guidance maintained.Snapshot, hooks ProgressHooks) *proposal {
-	if s.normalizer == nil {
+	if s.normalizer == nil || agent.CurrentLearningSupplement(ctx) != nil {
 		return nil
 	}
 	mergeCandidates := relatedNormalizationCandidates(candidates, retrieved)

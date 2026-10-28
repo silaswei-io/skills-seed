@@ -1,0 +1,21 @@
+# {{.Method.DisplayName}}
+
+- **Current Location**: `{{.Method.DisplayLocation}}`
+{{if .Method.LocationStatus}}- **Location Status**: `{{.Method.LocationStatus}}`
+{{end}}{{if .Method.HistoricalDisplayLocation}}- **Historical Location**: `{{.Method.HistoricalDisplayLocation}}`
+{{end}}{{if .Method.Module}}- **Module**: `{{.Method.Module}}`
+{{end}}{{if .Method.Type}}- **Type**: {{.Method.Type}}
+{{end}}{{if .Method.Description}}- **Function**: {{.Method.Description}}
+{{end}}
+{{if .Method.Function}}**Entry Signature**
+
+```{{.CodeFenceLanguage}}
+{{.Method.Function}}
+```
+{{end}}
+{{if .Method.Prerequisites}}**Prerequisites**: {{.Method.Prerequisites}}
+{{end}}
+{{if .Method.Returns}}**Returns**: {{.Method.Returns}}
+{{end}}
+{{if .Method.Usage}}**Usage**: {{.Method.Usage}}
+{{end}}

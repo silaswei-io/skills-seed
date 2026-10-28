@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
@@ -40,19 +41,6 @@ type learnCurrentResumeSummary struct {
 	SelectedFiles       string
 	PendingAnalyzeFiles int
 	Focuses             int
-	DevelopmentFocuses  int
-	CoverageFocuses     int
-}
-
-func focusKindCounts(focuses []domain.EvidenceFocus) (development, coverage int) {
-	for _, focus := range focuses {
-		if focus.IsDevelopmentRouteable() {
-			development++
-		} else {
-			coverage++
-		}
-	}
-	return development, coverage
 }
 
 func learnCurrentStateRepo(seedPath, scope string) *commandstate.Repository {
@@ -91,7 +79,6 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		selectionInputs = displayCount(len(session.State.Files))
 		selectedFiles = displayCount(len(session.State.Files) - selectionSkipped)
 	}
-	developmentFocuses, coverageFocuses := focusKindCounts(session.State.Agenda.Focuses)
 	return &learnCurrentResumeSummary{
 		Command:             session.State.Command,
 		CreatedAt:           session.State.CreatedAt,
@@ -101,8 +88,6 @@ func buildLearnCurrentResumeSummary(session *currentStateSession) *learnCurrentR
 		SelectedFiles:       selectedFiles,
 		PendingAnalyzeFiles: pendingResumeAnalysisFiles(session),
 		Focuses:             len(session.State.Agenda.Focuses),
-		DevelopmentFocuses:  developmentFocuses,
-		CoverageFocuses:     coverageFocuses,
 	}
 }
 
@@ -395,22 +380,14 @@ func loadOrCreateCurrentState(
 	}
 	var focuses []domain.EvidenceFocus
 	if len(focusRelPaths) > 0 {
-		plan, planErr := analyzerSvc.PlanLearningAgenda(ctx, &analyzer.PlanLearningAgendaRequest{
-			ProjectName:  projectName,
-			RootPath:     projectRoot,
-			Language:     language,
-			LearningMode: config.NormalizeLearningMode(mode),
-			FocusPaths:   focusRelPaths,
-			UserContext:  userContext,
-		})
-		if planErr != nil {
-			return nil, planErr
+		focus := domain.EvidenceFocus{ID: "explicit", Name: projectName, EntryPaths: focusRelPaths, Purpose: domain.EvidenceFocusPurposeCoverage}
+		if input := agent.CurrentLearningSupplement(ctx); input != nil {
+			focus = input.Focus
+			focus.EntryPaths = append([]string(nil), focusRelPaths...)
 		}
-		selectedPaths := learningAgendaFocusPaths(plan.Focuses)
-		changes.ApplyLearningSelection(selectedPaths, plan.Reason)
-		focuses = reconcileEvidenceFocuses(plan.Focuses, selectedPaths)
-		inputSummary.SelectedFiles = len(selectedPaths)
-		inputSummary.SkippedFiles = len(plan.SkippedPaths)
+		focuses = []domain.EvidenceFocus{focus}
+		inputSummary.SelectedFiles = len(focusRelPaths)
+
 	}
 	state = commandstate.NewStateWithMode(repo.Command(), projectName, language, stateMode, userContext, buildStateFiles(changes), changes.Deleted, focuses).
 		WithInvocationHash(invocationHash).
@@ -420,14 +397,6 @@ func loadOrCreateCurrentState(
 		return nil, err
 	}
 	return state, nil
-}
-
-func learningAgendaFocusPaths(focuses []domain.EvidenceFocus) []string {
-	paths := make([]string, 0)
-	for _, focus := range focuses {
-		paths = append(paths, focus.EntryPaths...)
-	}
-	return normalizeStatePaths(paths)
 }
 
 func pendingEvidenceFocuses(state *commandstate.State, changes *fileanalysis.FileChanges) []domain.EvidenceFocus {

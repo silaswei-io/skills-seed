@@ -1,5 +1,7 @@
 # Getting Started
 
+By default, `sync` / `learn current` scan locally with bundled CodeGraph, then select important semantic gaps using changed knowledge evidence and local call relationships. Candidates are dynamically batched by priority and evidence capacity, with independent review and checkpoints. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](Learning-and-Sync.md).
+
 This page sets up one project. For a multi-repository root, see [Workspace](Workspace.md).
 
 > **Use this page when:** you are generating Skills for an existing Git project for the first time, or need to reconfirm the shortest first-setup path.

@@ -7,16 +7,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/layout"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
-	"github.com/silaswei-io/skills-seed/internal/runtimefiles"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
-	"github.com/silaswei-io/skills-seed/internal/terminal/progress"
 	workspacediscovery "github.com/silaswei-io/skills-seed/internal/workspace"
 )
 
@@ -27,7 +24,6 @@ type workspaceLearnInputData struct {
 	Projects          []workspaceLearnInputProject `json:"projects"`
 	ConfigPath        string                       `json:"config_path,omitempty"`
 }
-
 type workspaceLearnInputProject struct {
 	ID                 string   `json:"id"`
 	Path               string   `json:"path"`
@@ -61,7 +57,7 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 	}
 	userContext := runtimecontext.UserContext(ctx)
 	decision, err := domain.PrepareInputFingerprint(ctx, cont.FileTracker, workspaceRelationshipFingerprintScope(), "workspace-relationships.json", workspaceRelationshipFingerprintInput{
-		Kind:           "workspace_relationship_learning",
+		Kind:           "workspace_relationships/local-v2",
 		WorkspaceInput: input,
 		UserContext:    userContext,
 	})
@@ -75,137 +71,10 @@ func saveWorkspaceRelationshipArtifacts(ctx context.Context, cont *container.Con
 		logger.Info(i18n.Get("LearnWorkspaceRelationshipsSkipped"))
 		return false, nil
 	}
-	workspaceInput, cleanup, err := prepareWorkspaceRelationshipRuntime(projectRoot, input, userContext)
-	if err != nil {
-		return false, err
-	}
-	defer cleanup()
-
-	tracker := progress.New(3)
-	var profile *domain.WorkspaceProfile
-	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceAnalyzeProfile"), func() error {
-		var err error
-		profile, err = analyzeWorkspaceRelationshipProfile(ctx, cont, workspaceName, projectRoot, workspaceInput, baseProfile, generatedAt)
-		return err
-	}); err != nil {
-		return false, err
-	}
-
-	var spec *domain.WorkspaceSpec
-	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceAnalyzeSpec"), func() error {
-		var err error
-		spec, err = analyzeWorkspaceRelationshipSpec(ctx, cont, workspaceName, projectRoot, workspaceInput, profile, generatedAt)
-		return err
-	}); err != nil {
-		return false, err
-	}
-
-	if err := tracker.RunStep(i18n.Get("ProgressLearnWorkspaceSaveArtifacts"), func() error {
-		return saveWorkspaceRelationshipResult(ctx, cont, profile, spec, decision)
-	}); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-type workspaceRelationshipRuntimeInput struct {
-	tmpDir          string
-	inputPath       string
-	userContextPath string
-	hasUserContext  bool
-}
-
-func prepareWorkspaceRelationshipRuntime(projectRoot string, input workspaceLearnInputData, userContext string) (workspaceRelationshipRuntimeInput, func(), error) {
-	runtimeDir := layout.New(filepath.Join(projectRoot, ".skills-seed")).Runtime()
-	if err := os.MkdirAll(runtimeDir, 0755); err != nil {
-		return workspaceRelationshipRuntimeInput{}, func() {}, err
-	}
-	tmpDir, err := os.MkdirTemp(runtimeDir, runtimefiles.TempPattern("workspace-learn"))
-	if err != nil {
-		return workspaceRelationshipRuntimeInput{}, func() {}, err
-	}
-	cleanup := func() { _ = os.RemoveAll(tmpDir) }
-	inputPath, err := writeJSONInput(filepath.Join(tmpDir, "workspace-input.json"), input)
-	if err != nil {
-		cleanup()
-		return workspaceRelationshipRuntimeInput{}, func() {}, err
-	}
-	userContextPath, err := writeWorkspaceRelationshipUserContext(tmpDir, userContext)
-	if err != nil {
-		cleanup()
-		return workspaceRelationshipRuntimeInput{}, func() {}, err
-	}
-	return workspaceRelationshipRuntimeInput{
-		tmpDir:          tmpDir,
-		inputPath:       inputPath,
-		userContextPath: userContextPath,
-		hasUserContext:  userContext != "",
-	}, cleanup, nil
-}
-
-func writeWorkspaceRelationshipUserContext(tmpDir, userContext string) (string, error) {
-	if userContext == "" {
-		return "", nil
-	}
-	path := filepath.Join(tmpDir, "user-context.md")
-	if err := os.WriteFile(path, []byte(userContext+"\n"), 0600); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func analyzeWorkspaceRelationshipProfile(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, input workspaceRelationshipRuntimeInput, baseProfile *domain.WorkspaceProfile, generatedAt string) (*domain.WorkspaceProfile, error) {
-	profile, err := cont.Agent.AnalyzeWorkspaceProfile(ctx, &agent.AnalyzeWorkspaceProfileRequest{
-		WorkspaceName:      workspaceName,
-		WorkspaceRoot:      projectRoot,
-		WorkspaceInputPath: input.inputPath,
-		UserContextPath:    input.userContextPath,
-		ProjectIDs:         workspacediscovery.ProjectIDs(baseProfile.Projects),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := agent.RequireResult(profile, "AnalyzeWorkspaceProfile"); err != nil {
-		return nil, err
-	}
-	profile, err = workspacediscovery.AssembleProfile(baseProfile, profile)
-	if err != nil {
-		return nil, err
-	}
-	profile.GeneratedAt = generatedAt
-	return profile, nil
-}
-
-func analyzeWorkspaceRelationshipSpec(ctx context.Context, cont *container.Container, workspaceName, projectRoot string, input workspaceRelationshipRuntimeInput, profile *domain.WorkspaceProfile, generatedAt string) (*domain.WorkspaceSpec, error) {
-	profilePath, err := writeJSONInput(filepath.Join(input.tmpDir, "workspace-profile.json"), profile)
-	if err != nil {
-		return nil, err
-	}
-	spec, err := cont.Agent.AnalyzeWorkspaceSpec(ctx, &agent.AnalyzeWorkspaceSpecRequest{
-		WorkspaceName:        workspaceName,
-		WorkspaceRoot:        projectRoot,
-		WorkspaceInputPath:   input.inputPath,
-		WorkspaceProfilePath: profilePath,
-		UserContextPath:      input.userContextPath,
-		ProjectIDs:           workspacediscovery.ProjectIDs(profile.Projects),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if err := agent.RequireResult(spec, "AnalyzeWorkspaceSpec"); err != nil {
-		return nil, err
-	}
-	spec, err = workspacediscovery.AssembleSpec(
-		workspacediscovery.SpecFromProfile(profile, cont.ConfigRepo.GetSkillsLocale()),
-		spec,
-		profile,
-		workspacediscovery.ValidationOptions{RootPath: projectRoot, HasUserContext: input.hasUserContext},
-	)
-	if err != nil {
-		return nil, err
-	}
+	baseProfile.GeneratedAt = generatedAt
+	spec := workspacediscovery.SpecFromProfile(baseProfile, cont.ConfigRepo.GetSkillsLocale())
 	spec.GeneratedAt = generatedAt
-	return spec, nil
+	return true, saveWorkspaceRelationshipResult(ctx, cont, baseProfile, spec, decision)
 }
 
 func saveWorkspaceRelationshipResult(ctx context.Context, cont *container.Container, profile *domain.WorkspaceProfile, spec *domain.WorkspaceSpec, decision *domain.InputFingerprintDecision) error {
@@ -373,16 +242,4 @@ func projectProfileModuleSummaries(profile *domain.ProjectProfile) []string {
 		modules = append(modules, module.Path+": "+module.Description)
 	}
 	return modules
-}
-
-func writeJSONInput(path string, value interface{}) (string, error) {
-	data, err := json.MarshalIndent(value, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	data = append(data, '\n')
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		return "", err
-	}
-	return path, nil
 }

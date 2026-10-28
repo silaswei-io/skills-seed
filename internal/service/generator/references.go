@@ -66,11 +66,11 @@ func referenceAvailability(profile *domain.ProjectProfile, patterns []domain.Pat
 		return refs
 	}
 	refs.ProjectSpec = true
-	refs.ProjectOverview = true
 	if profile != nil {
+		refs.ProjectOverview = profile.Summary != "" || profile.Architecture != "" || profile.DataFlow != "" || profile.DependencyGraph != "" ||
+			len(profile.Layers)+len(profile.Frameworks)+len(profile.Dependencies)+len(profile.KeyModules)+len(profile.ConfigPatterns)+len(profile.FrameworkPatterns) > 0
 		refs.BusinessMethods = len(profile.BusinessMethods) > 0
 		refs.KeyModules = len(profile.KeyModules) > 0
-		refs.CommonUtils = len(profile.CommonUtils) > 0
 	}
 	for _, pattern := range patterns {
 		if pattern.Category == domain.CategoryBusiness {
@@ -199,7 +199,7 @@ func profileReferenceItems(profile *domain.ProjectProfile, locale, prefix string
 		return nil
 	}
 
-	items := make([]skills.ReferenceItem, 0, 3)
+	items := make([]skills.ReferenceItem, 0, 2)
 	if len(profile.BusinessMethods) > 0 {
 		items = append(items, skills.ReferenceItem{
 			Title:       generatorText(locale, "GeneratorProfileReferenceBusinessMethodsTitle"),
@@ -212,13 +212,6 @@ func profileReferenceItems(profile *domain.ProjectProfile, locale, prefix string
 			Title:       generatorText(locale, "GeneratorProfileReferenceModulesTitle"),
 			Description: generatorText(locale, "GeneratorProfileReferenceModulesDescription"),
 			Path:        prefix + "modules.md",
-		})
-	}
-	if len(profile.CommonUtils) > 0 {
-		items = append(items, skills.ReferenceItem{
-			Title:       generatorText(locale, "GeneratorProfileReferenceCommonUtilsTitle"),
-			Description: generatorText(locale, "GeneratorProfileReferenceCommonUtilsDescription"),
-			Path:        prefix + "common-utils.md",
 		})
 	}
 	return items

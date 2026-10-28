@@ -9,8 +9,8 @@
 ## 使用方式
 
 - 本规范是权威规则入口，只保留当前项目的权威约束及同步覆盖；源码学习内容按职责分流到项目概览、业务模式和能力入口索引。
-- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，能力入口读 [能力入口索引](./business-methods.md){{end}}。
-- 分类 patterns 用于行为模式和复用边界；{{if .References.BusinessMethods}}[能力入口索引](./business-methods.md){{else}}能力入口索引{{end}} 用于已验证的能力、签名、前置条件、返回语义和使用场景。
+{{if .References.ProjectOverview}}- 架构地图读 [项目概览](./project-overview.md){{if .References.KeyModules}}，模块详情读 [关键模块](./modules.md){{end}}{{if .References.BusinessMethods}}，能力入口读 [能力入口索引](./business-methods.md){{end}}。{{end}}
+- 分类 patterns 用于行为模式和复用边界；{{if .References.BusinessMethods}}[能力入口索引](./business-methods.md){{else}}能力入口索引{{end}} 用于定位已验证的能力，签名、前置条件、返回语义和使用场景见逐条详情。
 - 权威规则只来自用户维护或内置约束；源码学习结果只作为复用和安全检查入口。
 - 显式权威规则优先于当前代码和学习到的 reference；当前代码只能校正陈旧的源码学习摘要，不能推翻或放宽权威约束。
 
@@ -28,7 +28,7 @@
 {{end}}
 {{end}}
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**：{{.Rule}}（来源：`{{.Source}}`{{if .Evidence}}；证据：{{range $i, $path := .Evidence}}{{if $i}}、{{end}}`{{$path}}`{{end}}{{end}}）
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}*尚未提取用户或内置权威规则；源码学习模式见分类 patterns references。*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}未保存额外的权威规则摘要；以用户指令和下列适用原文为准。
 {{end}}{{end}}
 {{if .AuthorityCoverage}}## 权威同步覆盖
 
@@ -37,3 +37,10 @@
 {{range .AuthorityCoverage}}- `{{.Source}}`{{if .Sections}}：{{range $i, $section := .Sections}}{{if $i}}、{{end}}{{$section}}{{end}}{{else}}（文件级覆盖）{{end}}
 {{end}}
 {{end}}
+{{if .AuthorityPaths}}
+## 权威原文入口
+
+路径相对于项目根。先读取根规则，再读取改动目录适用的规则；子目录规则不自动作用于全仓。这里只记录来源，不将发现文件视为已完成规则提取。
+
+{{range .AuthorityPaths}}- `{{.}}`
+{{end}}{{end}}

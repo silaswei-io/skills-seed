@@ -85,11 +85,6 @@ func TestLearningPromptDataWritesMaintainedGuidanceSeparately(t *testing.T) {
 func TestCurrentLearningPromptDataIncludesLearningMode(t *testing.T) {
 	session := &PromptInputSession{dir: t.TempDir()}
 
-	planData, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{})
-	require.NoError(t, err)
-	require.Equal(t, config.LearningModeNormal, planData["LearningMode"])
-	require.NotContains(t, planData, "LearningScope")
-
 	currentData, err := AnalyzeCurrentCodebaseBatchPromptData(session, &AnalyzeCurrentCodebaseBatchRequest{
 		LearningMode: config.LearningModeDeep,
 	})
@@ -113,36 +108,6 @@ func TestCurrentBatchPromptDataKeepsSharedContextPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, sharedPath, deltaData["SharedContextPath"])
 	require.NoFileExists(t, filepath.Join(session.dir, "shared-context.md"))
-}
-
-func TestPlanLearningAgendaPromptDataWritesFocusedPathList(t *testing.T) {
-	session := &PromptInputSession{dir: t.TempDir()}
-
-	data, err := PlanLearningAgendaPromptData(session, &PlanLearningAgendaRequest{
-		FocusPaths: []string{"internal/key/create.go", "internal/auth/login.go", "internal/auth/login.go"},
-		SourceFacts: []PlanningSourceFact{{
-			Path: "internal/auth/login.go", SizeBytes: 128, LineCount: 8, NonBlankLines: 6, SymbolCount: 1,
-			Symbols: []PlanningSymbolFact{{Name: "Login", Kind: "function", Line: 3}},
-		}},
-	})
-	require.NoError(t, err)
-
-	path, ok := data["FocusPathsPath"].(string)
-	require.True(t, ok)
-	require.Equal(t, filepath.Join(session.dir, "analysis-files.txt"), path)
-	require.Equal(t, 2, data["FocusPathCount"])
-
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	require.Equal(t, "internal/auth/login.go\ninternal/key/create.go\n", string(content))
-	require.NotContains(t, data, "FocusPaths")
-
-	factsPath, ok := data["SourceFactsPath"].(string)
-	require.True(t, ok)
-	require.Equal(t, 1, data["SourceFactCount"])
-	facts, err := os.ReadFile(factsPath)
-	require.NoError(t, err)
-	require.JSONEq(t, `[{"path":"internal/auth/login.go","size_bytes":128,"line_count":8,"non_blank_lines":6,"symbol_count":1,"symbols":[{"name":"Login","kind":"function","line":3}]}]`, string(facts))
 }
 
 func TestAnalyzeProjectPromptDataNormalizesStructureInputFile(t *testing.T) {
@@ -266,4 +231,36 @@ func TestPromptInputSessionForContextKeepsRuntimeInputsForDebugging(t *testing.T
 	require.FileExists(t, inputPath)
 	require.Contains(t, filepath.ToSlash(inputPath), ".skills-seed/runtime")
 	require.Regexp(t, `^\d{8}-\d{6}(?:-\d{3,})?-prompt-input-skills-seed-learning-profile-refresh-\d+$`, filepath.Base(filepath.Dir(inputPath)))
+}
+
+func TestPromptInputSessionForContextDoesNotCreateUnusedRuntime(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-learning-supplement")
+	require.NoError(t, err)
+	require.NoDirExists(t, filepath.Join(seedPath, "runtime"))
+
+	path, err := session.UsePathOrWrite("existing-input.json", "input.json", "unused")
+	require.NoError(t, err)
+	require.Equal(t, "existing-input.json", path)
+	path, err = session.Write("empty.txt", " \n ")
+	require.NoError(t, err)
+	require.Empty(t, path)
+	session.Cleanup()
+	require.NoDirExists(t, filepath.Join(seedPath, "runtime"))
+}
+
+func TestPromptInputSessionForContextCleansFailedFirstWrite(t *testing.T) {
+	seedPath := filepath.Join(t.TempDir(), ".skills-seed")
+	ctx := runtimecontext.WithSeedPath(context.Background(), seedPath)
+	session, err := NewPromptInputSessionForContext(ctx, "skills-seed-learning-supplement")
+	require.NoError(t, err)
+
+	_, err = session.Write("missing/input.json", `{"content":"demo"}`)
+	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoDirExists(t, filepath.Join(seedPath, "runtime"))
+
+	path, err := session.Write("input.json", `{"content":"demo"}`)
+	require.NoError(t, err)
+	require.FileExists(t, path)
 }

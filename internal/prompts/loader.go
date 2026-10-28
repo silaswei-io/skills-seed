@@ -66,12 +66,13 @@ var contextPromptFiles = []contextPromptFile{
 }
 
 var knowledgePromptNames = map[string]bool{
+	"learning-supplement":         true,
+	"learning-semantic-screen":    true,
 	"core-user-pattern":           true,
 	"core-workspace-profile":      true,
 	"core-workspace-spec":         true,
 	"learning-delta-pack-analyze": true,
 	"learning-pack-analyze":       true,
-	"learning-pack-plan":          true,
 	"learning-pattern-normalize":  true,
 	"learning-profile-refresh":    true,
 	"learning-authority-extract":  true,
@@ -462,7 +463,7 @@ func loadDefaultContextScaffoldLines() map[string]struct{} {
 }
 
 func (l *Loader) saveRenderedPrompt(name, content string, manifest renderedPromptManifest) {
-	if strings.TrimSpace(l.seedPath) == "" {
+	if strings.TrimSpace(l.seedPath) == "" || strings.TrimSpace(content) == "" {
 		return
 	}
 

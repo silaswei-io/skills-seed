@@ -1,16 +1,9 @@
 # {{.GroupTitle}}
 
 **分类**: {{.Category}}
-**模式数量**: {{.PatternCount}}
 **最后更新**: {{.LastUpdated}}
 
-{{.GroupSummary.Description}}
-
-本页只反映已学习到且有源码证据的复用点；模式较少的子域仍应按下方证据入口回到当前源码确认完整业务边界。
-
-## 需求匹配
-
-{{if .GroupSummary.IsFallback}}当需求涉及业务规则、状态变化、运行期行为或跨模块流程，但无法从需求词或路径匹配到稳定子域时，读取本页。{{else}}当需求提到 {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}，出现同义业务动作、状态变化、规则策略、入口渠道或外部依赖，或改动路径位于 {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}本子域相关代码{{end}} 时，优先读取本页。{{end}}
+本页记录已审查的业务判断。按需求和证据入口核对当前实现及适用边界。
 
 {{if .RelatedReferences}}
 ## 相关参考

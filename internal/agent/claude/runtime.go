@@ -138,7 +138,7 @@ func (c *ClaudeAgent) doCallClaude(ctx context.Context, operation, prompt, outpu
 	duration := time.Since(startTime)
 
 	if err != nil {
-		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
+		err = agent.NormalizeInvocationError(err, ctx.Err(), duration.Round(time.Second))
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
 		retryable := agent.IsRetryableInvocationError(err) || isRetryableError(stdoutStr, stderrStr)
@@ -415,6 +415,8 @@ func claudePrintArgsForConversation(allowUserPlugins bool, outputSchema string, 
 	tools := "Read,Glob,Grep,LS"
 	if promptOnly {
 		tools = ""
+		// 自动补充只判断给定证据，使用低推理预算，避免继承交互会话的长时间探索设置。
+		args = append(args, "--effort", "low")
 	}
 	return append(args, "--tools", tools)
 }

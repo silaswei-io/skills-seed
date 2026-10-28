@@ -12,7 +12,7 @@
 | 多条模式语义重复 | `patterns compact --dry-run` 后执行整理 | 直接编辑数据库或 runtime |
 | 团队明确的长期禁止项或契约 | `rule` | 假设源码能自动推导 |
 | 发布、验收、部署等任务步骤 | `workflow` | 让源码学习把过程推断为事实 |
-| 项目地图或权威文件已变化 | `learn current --profile refresh` | 手改 profile JSON |
+| 已保存知识或生成导航已变化 | `skills-seed generate skills` | 运行生成命令重新投影 |
 
 ## 重新学习前重置知识
 
@@ -25,7 +25,7 @@
 | 仅移除团队 Rule | `skills-seed reset rules` | 按需要重新添加 `rule`，再 `generate skills` |
 | 仅移除任务 Workflow | `skills-seed reset workflows` | 按需要重新添加 `workflow`，再 `generate skills` |
 
-`patterns` 会连带清理项目画像、文件快照、可恢复 checkpoint 和学习历史，确保下一次 `sync` 不会复用旧的分析结果。范围可组合，例如 `skills-seed reset patterns rules`；`all` 必须单独使用，且选择性重置不能与 `--mode`、`--workspace`、`--locale` 或 `--skills-locale` 同时使用。
+`patterns` 会连带清理项目画像、可恢复 checkpoint 和学习历史，确保下一次 `sync` 不会复用旧的分析结果。范围可组合，例如 `skills-seed reset patterns rules`；`all` 必须单独使用，且选择性重置不能与 `--mode`、`--workspace`、`--locale` 或 `--skills-locale` 同时使用。
 
 只需要修订一条模式时，优先使用 `patterns update`；只需要继续被中断的学习时，优先使用 `sync --resume`。完整 `skills-seed reset`（不带范围）用于重新初始化或切换 project/workspace 模式。
 
@@ -70,11 +70,10 @@ skills-seed generate skills
 
 ## 项目画像与长期背景
 
-`profile show` 用于检查当前项目画像。权威来源、结构或模块关系已经改变时，刷新画像：
+`profile show` 用于检查当前项目画像。需要检查当前导航时直接查看已保存画像：
 
 ```bash
 skills-seed profile show
-skills-seed learn current --profile refresh
 skills-seed generate skills
 ```
 

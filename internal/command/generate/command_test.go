@@ -635,3 +635,34 @@ func stubGenerateChildStepSleep(t *testing.T, fn func(time.Duration)) {
 		sleepAfterGenerateChildStep = previous
 	})
 }
+
+func TestRunGeneratePublishesLocalNavigationWithoutLearnedPatterns(t *testing.T) {
+	if _, err := os.Stat("../../../internal/codegraph/assets/runtime.zip"); err != nil && os.Getenv("SKILLS_SEED_CODEGRAPH_HOME") == "" {
+		t.Skip("run make bundle for SDK integration test")
+	}
+	provider := registerGenerateWorkspaceMockAgentFactory(t)
+	root := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".git"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "main.go"), []byte("package main\nfunc ExistingCapability() {}\n"), 0600))
+	seed := filepath.Join(root, ".skills-seed")
+	cfg, err := config.NewRepository(seed, "en-US")
+	require.NoError(t, err)
+	value := cfg.Get()
+	value.Project.Name = "local-demo"
+	value.Project.RootPath = root
+	value.Agent.Engine = provider
+	value.Agent.Commands = map[string]string{provider: provider}
+	value.Skills.Target = "codex"
+	value.Skills.Paths = map[string]string{"codex": ".agents/skills/local-demo"}
+	require.NoError(t, cfg.Update(value))
+	cont, err := container.NewContainer(context.Background(), seed)
+	require.NoError(t, err)
+	defer cont.Close()
+	cont.Agent = &mocks.MockAgent{NameVal: provider, AvailableVal: false}
+	require.NoError(t, RunGenerate(cont))
+	require.FileExists(t, filepath.Join(root, ".agents/skills/local-demo/SKILL.md"))
+	require.FileExists(t, filepath.Join(root, ".agents/skills/local-demo/references/code-navigation.md"))
+	count, err := cont.PatternRepo.Count(context.Background())
+	require.NoError(t, err)
+	require.Zero(t, count)
+}

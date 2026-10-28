@@ -1,5 +1,7 @@
 # Learn
 
+Default learning scans locally with bundled CodeGraph, groups candidates along real call paths, then analyzes and independently reviews remaining semantic gaps in dynamic evidence batches. Pending gaps and failure reasons are recorded in `.skills-seed/runtime/local-supplement.json`; a normal `sync` retries unfinished stages. Use `learn current --semantic --focus <path>` for explicit deeper analysis. Query existing capabilities with `skills-seed codegraph query`, then inspect callers/callees/impact/trace before creating a new implementation. Structural navigation is not proof of complete business understanding.
+
 Use learning commands when the goal is updating durable project knowledge.
 
 ## `skills-seed learn current`
@@ -8,14 +10,12 @@ Purpose:
 
 - Analyze current files.
 - Update learned patterns and project state.
-- Optionally refresh project profile.
 - Avoid a separate generation step unless the user runs one later.
 
 Flags:
 
 - `--language, -l`: override detected project language.
 - `--focus, -f`: restrict analysis to paths. Repeatable.
-- `--profile`: `auto`, `skip`, or `refresh`.
 - `--context`: one-shot text guidance.
 - `--context-path`: one-shot guidance from files. Repeatable.
 - `--force`: ignore saved file fingerprints and relearn selected files.
@@ -25,8 +25,6 @@ Use cases:
 - Learn current changes: `skills-seed learn current`
 - Force relearning: `skills-seed learn current --force`
 - Focus on directories: `skills-seed learn current --focus internal/command --focus internal/service`
-- Refresh profile during learning: `skills-seed learn current --profile refresh`
-- Skip profile work: `skills-seed learn current --profile skip`
 
 Boundaries:
 
@@ -37,5 +35,4 @@ Boundaries:
 After learning:
 
 - Run `skills-seed patterns show` to inspect learned rules.
-- Run `skills-seed profile show` to inspect project profile.
 - Run `skills-seed generate skills` when learned state should be rendered.

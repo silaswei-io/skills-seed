@@ -151,23 +151,6 @@ func runGenerate(cont *container.Container, opts generateOptions) error {
 		}
 	}
 
-	if count == 0 && !isWorkspaceMode {
-		workflowCount, err := countWorkflows(cont)
-		if err != nil {
-			logger.Error(i18n.GetWithParams("GenerateCountFailed", map[string]interface{}{"Error": err.Error()}))
-			return err
-		}
-		ruleCount, ruleErr := countRules(cont)
-		if ruleErr != nil {
-			return ruleErr
-		}
-		if workflowCount == 0 && ruleCount == 0 {
-			if !opts.quiet {
-				logger.Warn(i18n.Get("GenerateNoPatterns"))
-			}
-			return nil
-		}
-	}
 	if !opts.quiet {
 		logger.Debug(i18n.GetWithParams("GenerateFoundPatterns", map[string]interface{}{"Count": count}) + "\n")
 	}
@@ -227,25 +210,6 @@ func generateProjectProgressHooks(tracker *progress.Tracker, opts generateOption
 		},
 		OnStepComplete: tracker.CompleteStep,
 	}
-}
-
-func countRules(cont *container.Container) (int, error) {
-	if cont == nil || cont.RuleRepo == nil {
-		return 0, nil
-	}
-	rules, err := cont.RuleRepo.List()
-	return len(rules), err
-}
-
-func countWorkflows(cont *container.Container) (int, error) {
-	if cont == nil || cont.WorkflowRepo == nil {
-		return 0, nil
-	}
-	workflows, err := cont.WorkflowRepo.List()
-	if err != nil {
-		return 0, err
-	}
-	return len(workflows), nil
 }
 
 func runGenerateWorkspace(ctx context.Context, cont *container.Container, opts generateOptions) (string, error) {
@@ -367,8 +331,7 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 		childOutputPath := outputPathForCurrentTarget(childCont)
 		childStartedAt := time.Now()
 		loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
-		childLogDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
-		if err := logger.WithScopedLog(childCtx, childLogDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, func(scopedCtx context.Context, _ string) error {
+		generateChild := func(scopedCtx context.Context, _ string) error {
 			return childCont.GeneratorSvc.GenerateSkillsWithOptions(scopedCtx, childOutputPath, generator.GenerateOptions{
 				Progress: generator.GenerateProgressHooks{
 					OnStepStart:    startStep,
@@ -377,8 +340,16 @@ func generateWorkspaceChildSkillsWithOptions(ctx context.Context, cont *containe
 				},
 				ProjectedRules: ruleoutput.ApplicableToProject(workspaceRules, project.ID, project.Path),
 			})
-		}); err != nil {
-			return err
+		}
+		var generateErr error
+		if loggingConfig.Enabled {
+			childLogDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
+			generateErr = logger.WithScopedLog(childCtx, childLogDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, generateChild)
+		} else {
+			generateErr = generateChild(childCtx, "")
+		}
+		if generateErr != nil {
+			return generateErr
 		}
 		if err := recordGenerateJournal(childCont, childOutputPath, childStartedAt, runjournal.ScopeChild); err != nil {
 			logger.Warn(i18n.GetWithParams("GenerateJournalWriteFailed", map[string]interface{}{"Error": err.Error()}))

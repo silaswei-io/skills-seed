@@ -1,5 +1,7 @@
 # 核心概念
 
+默认 `sync` / `learn current` 先用内置 CodeGraph 本地扫描，再按已有知识证据变化和本地调用关系选择关键语义缺口。候选按重要性顺序和证据容量动态组批，沿用独立审核和检查点恢复。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](Learning-and-Sync.md)。
+
 Skills Seed 将不同可信度、不同维护者和不同用途的信息分开保存。正确区分它们，是生成可靠 Skill 的前提。
 
 > **适用场景：** 你需要判断信息应写入 Rule、Workflow、Context，还是应由源码学习和审查。

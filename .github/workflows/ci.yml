@@ -42,6 +42,9 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
 
+      - name: Bundle CodeGraph for integration tests
+        run: python3 scripts/bundle-codegraph.py linux amd64
+
       - name: Vet
         run: go vet ./...
 

@@ -1,5 +1,27 @@
 # Skills Seed 配置说明
 
+## 本地扫描与按需语义补充
+
+默认使用本地 CodeGraph 结构扫描。`learn current` 和 `sync` 使用随发行包内置的 CodeGraph 1.6.2 更新本地结构索引，结构扫描不调用 AI；程序只为重要语义缺口自动调用分析和独立审核，不再进行全仓 AI 议程规划。源码开发构建请先执行 `make bundle`；也可用 `SKILLS_SEED_CODEGRAPH_HOME` 指定官方平台包目录。发行二进制首次使用时解压组件到用户缓存，无需全局 Node/npm，也不在运行时下载组件。
+
+```bash
+skills-seed sync
+skills-seed codegraph query "HTTP"
+# 也可以主动指定需要更深入判断的范围：
+skills-seed learn current --semantic --focus internal/order --context "确认取消订单的状态边界"
+skills-seed generate skills
+```
+
+生成的 `references/code-navigation.md` 按目录链接到符号入口，并要求开发 Agent 先检索、核对签名与调用示例，再决定复用、扩展或新增。目录是结构导航，不是自动推断的业务域。`codegraph callers/callees/impact` 使用查询返回的符号 ID；`codegraph trace <from-id> <to-id>` 查询静态调用路径。动态调用与跨服务关系可能不完整，空结果不能证明没有现成能力。
+
+索引保存到标准 `.codegraph/`，与其他 CodeGraph 工具复用。skills-seed 只在该目录写入自己的 `navigation.json` 和锁文件；扫描按入选路径更新索引，不因范围收缩而重建共享数据库。源码选择沿用排除规则，缓存与生成 Skill 不参与反向学习。未被 SDK 索引的文件会显式列出。解析失败会报错，不冒充扫描成功。
+
+本地结构扫描本身不更新语义学习指纹；只有自动补充完成分析、审核和入库后，才提交该范围的语义指纹。未完成的检查点保留。生成时，源码证据指纹变化的旧 Pattern 暂不投影；原知识仍保留。项目导航由本地索引和已保存知识确定性生成；源码证据变化时只停止投影失效的旧业务 Pattern。Rule/Workflow 保持原有维护方式，权威文件应由消费 Skill 的 Agent 按实际路径直接阅读。
+
+工作区默认从显式配置生成项目路由，不通过 AI 猜测跨项目业务关系。子项目按同样策略自动补充；主动深挖时进入子项目使用 `--semantic --focus`。`--context` 传入自动补充任务；`--focus` 只限制本地扫描范围。`--force` 重新确认当前索引并触发产物刷新。
+
+自动补充优先检查已有知识的变更证据，其次从本地 CodeGraph 调用图选择语义入口。同一调用链的下游能力保留在本地导航，不重复发起逐文件 AI 问题；无法由图确认的独立入口仍待分析。多个完整证据批次才使用紧凑结构事实并行预筛选，失败或不确定时保留候选。源码已删除的旧知识由生成阶段停止投影。候选按重要性顺序和完整证据容量动态组批，已有知识的关联证据必须保留；证据包上限 64 KiB、完整提示词上限 96 KiB。超限不截断，异常批次保留待补充。正常 `sync` 持续处理全部候选，不设置项目级总时长；单次 Agent 调用仍受 `agent.timeout`、重试次数和输入大小保护。AI 不可用、失败、超时或明确返回证据不足时，保留对应批次并继续其他独立批次，原因及待补充路径写入 `.skills-seed/runtime/local-supplement.json`。`mode` 和 `structural` 仅控制显式语义补充；默认流程不再有 AI 议程配置。
+
 [简体中文](CONFIGURATION.md) | [English](CONFIGURATION.EN.md)
 
 配置文件位于 `.skills-seed/config.yaml`。`skills-seed init` 会按当前项目生成默认配置；大多数路径都相对项目根目录或 `.skills-seed` 目录，具体以字段说明为准。
@@ -10,7 +32,7 @@
 
 - 顶层 `project` 改名为 `profile`，表示当前配置文件所属项目或工作区本身，不表示 `project` 运行模式。
 - `workspace` 下只保留 `projects`，不再提供 `shared`、`contracts`、`infra` 给用户手填。
-- workspace 公共库、契约和基础设施影响会在 `learn current` 阶段根据仓库证据、子项目画像和一次性用户说明分析并沉淀到 workspace profile/spec，不从配置文件读取；生成阶段只消费已沉淀结果。
+- workspace 公共库、契约和基础设施路由由显式项目配置和本地 CodeGraph 事实确定，不通过额外 AI 画像调用猜测；生成阶段只消费已沉淀结果。
 - workspace 根配置的 `profile.language` 默认留空，因为一个工作区可以包含多种语言子项目。
 - `analysis.codegraph` 已移除，结构化上下文与符号校验统一配置在 `learning.current.structural`；默认 `provider: auto` 优先使用 CodeGraph，并在 CodeGraph 不可用时回退内嵌 tree-sitter。
 
@@ -53,7 +75,6 @@ learning:
       min_confidence: 0.75
       min_single_evidence_confidence: 0.85
     agenda:
-      fallback_paths_per_focus: 256
     structural:
       enabled: true
       provider: "auto"
@@ -67,6 +88,7 @@ skills:
     codex: ".agents/skills/<project-name>-dev"
 
 logging:
+  enabled: false
   level: "DEBUG"
   logs_path: "runtime/logs"
   max_log_files: 30
@@ -165,8 +187,7 @@ exclude:
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
 | `mode` | `normal` | 学习策略均以高精准率准入：`fast` 缩小证据探索范围；`normal` 为默认；`deep` 扩大证据探索范围，但不降低模式准入标准 |
-| `agenda.fallback_paths_per_focus` | `256` | AI 未分配路径时，每个确定性兜底焦点携带的最大输入路径数；用于控制请求体积和断点续跑，不表示路径价值判断 |
-| `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在 focus、diff、sample 或入口文件时运行 |
+| `structural.enabled` | `true` | 是否启用结构化上下文；即使开启，也只会在存在焦点、源码样本或入口文件时运行 |
 | `structural.provider` | `auto` | 结构化上下文与符号校验来源：`auto` 优先 CodeGraph 并在不可用时回退 tree-sitter；`codegraph` 强制使用 CodeGraph；`treesitter` 显式选择内嵌 parser |
 | `structural.max_symbols` | `30` | 输出到结构化上下文的最大符号数 |
 | `structural.max_file_size` | `512` | 单个源码文件大小上限，单位 KB；超过时跳过该文件 |
@@ -179,9 +200,9 @@ exclude:
 
 0.9.0 起，项目结构摘要、样例文件收集和结构化预扫描都统一使用同一套配置化文件过滤策略。除 `.git`、`.skills-seed` 和已配置的 skills 输出目录等内置安全边界外，不再在 analyzer 内额外维护目录名关键字；需要排除依赖、构建产物或项目自定义目录时，应写入 `exclude`。
 
-当前版本中，`learn current` 在本地文件过滤后会保留全部范围内候选，不再用路径词表或模型猜测删减源码文件。候选路径、diff、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
+当前版本中，`learn current` 在本地文件过滤后会保留全部范围内候选，不再用路径词表或模型猜测删减源码文件。候选路径、焦点文件和结构化上下文等大块输入会写入 runtime 输入文件，prompt 通过路径引用它们。
 
-0.9.11 起，文件过滤策略默认还会叠加 Git ignore 规则；0.9.12 起，Git ignore 开关收敛到 `exclude.gitignore`。如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。0.9.13 起，快照仍保存完整当前状态，但发送给 AI 的 diff 会按 `exclude.paths` 和 `exclude.gitignore` 过滤，避免被忽略文件作为删除 diff 进入分析。
+文件过滤策略默认叠加 Git ignore 规则；如需分析被 `.gitignore` 忽略的文件，可将 `exclude.gitignore` 设为 `false`。增量状态由持久化文件指纹判定，不保存源码快照；AI 对照当前源码证据与已保存知识判断语义变化。打开已有项目时会移除旧版本留下的 `.skills-seed/cache/snapshots/`。
 
 #### 建议
 
@@ -202,13 +223,13 @@ exclude:
 
 学习焦点没有可配置分类。规划阶段根据源码责任、能力、资源动作、状态转换、契约、集成和横切机制，自动形成验证未来开发决策所需的最小证据集。焦点只服务于本次取证，不会成为 Workflow、工作步骤或生成 Skill 的固定分类。模型输出解析会额外修复证据行号范围表达式，将 `"line": 29-43` 这类非法 JSON 归一为单个行号。
 
-当前版本中，每个证据焦点都使用独立的分析调用，避免跨焦点结论串扰；分析并发只由 `agent.parallelism` 控制。独立知识审查继续以完整证据焦点为单元，按议程串行执行，每个焦点完成后立即保存 checkpoint；全部焦点审查完成后，候选才进入一次跨焦点全局规范化。增量分析提出的候选若未通过本地证据准入，该焦点在没有其他合格决策时会降级为唯一的 `no_change` 回执，区分“已分析但无可入库模式”和“Agent 遗漏焦点”。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
+当前版本按证据容量动态组批，相关焦点可以共用一次分析调用；独立批次并发受 `agent.parallelism` 控制。分析结果逐项保存后，相应焦点的独立知识审查即可与其他批次的分析或审查并行执行；同一运行的 checkpoint 由主流程逐项保存。增量分析提出的候选若未通过本地证据准入，该焦点在没有其他合格决策时会降级为唯一的 `no_change` 回执，区分“已分析但无可入库模式”和“Agent 遗漏焦点”。生成 skills 时，低频或局部证据不会进入强约束层，避免把偶发现象误写成必须遵守的项目标准。
 
 独立审查中的能力入口以完整 `business_method` 表示设置或替换，省略即移除，不再使用与对象重复表达状态的判定字段。审查 Agent 必须打开候选证据直接调用或引用的精确定义，记录完整声明、项目相对位置、前置条件和结果/错误语义；本地层仅校验结构化契约和路径安全，不以调用方与定义文件必须相同来替代语义审查。
 
 候选准备只做范围、排除规则和路径规范化，不根据文件名、目录名、语言或框架词汇判断知识价值。所有范围内候选都进入议程规划，规划结果必须用焦点或带理由的跳过回执完整覆盖输入路径。后续源码分析与独立知识审查负责语义判断；本地代码只校验证据、范围、结构化契约和覆盖完整性。
 
-初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发；普通 project 配置用它控制当前代码学习的证据焦点并发。`learn current` 使用独立 runtime 调用：候选准备后由 planning 调用生成证据包，每个证据焦点使用独立调用。`learning.current.pattern_admission` 控制候选进入合并与入库链路所需的置信度。
+初始化交互中的“Agent 总并发数”会写入 `agent.parallelism`。workspace 根配置用它控制子项目并发和共享 Agent 调用额度；普通 project 配置用它控制独立证据批次的并发。当前代码学习本地规划证据批次，只在关键语义缺口处调用 Agent。`learning.current.pattern_admission` 控制候选进入合并与入库链路所需的置信度。
 
 0.8.0 起，Agent 输出默认单独保存在 `.skills-seed/runtime/agent-outputs/`，包含最终内容、原始 CLI 输出、stderr 和 manifest。运行日志只记录长度和归档路径，不再输出模型回复预览或 stdout/stderr 明文。0.10.3 起，最终内容如果是合法 JSON，会在 `.md` 归档中格式化为可读的 `json` 代码块。
 
@@ -235,7 +256,7 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 | `timeout` | `1800` | 单个 Agent 阶段的总预算，单位秒；包含排队、执行、退避和结构修复，重试不重置截止时间 |
 | `max_turns` | `80` | 单次 Agent 调用允许的最大探索轮数；达到上限后结束调用，避免上下文无限增长；当前由 Claude CLI 使用 |
 | `allow_user_plugins` | `false` | 是否允许 Agent 加载用户插件；默认关闭，避免批处理被用户插件影响 |
-| `parallelism` | `0` | Agent 并发上限；workspace 根配置同时限制子项目数和共享 Agent 调用数，子项目配置不能放大共享额度。项目内分析和审查共享额度，知识审查串行；`0` 表示自动 |
+| `parallelism` | `0` | Agent 并发上限；workspace 根配置同时限制子项目数和共享 Agent 调用数，子项目配置不能放大共享额度。分析与独立审查共享额度；项目模式下 `0` 按本机 CPU 自动分配，最多 6 个并行调用 |
 | `model` | 空 | skills-seed 调用 Agent CLI 时使用的模型名；空值不传模型参数，继承本机 Agent CLI 默认配置 |
 | `retry.max_retries` | `3` | 可重试错误的最大重试次数；配置为 `0` 时使用默认值 `3` |
 | `retry.initial_interval` | `15` | 首次重试等待秒数；配置为 `0` 时使用默认值 `15` |
@@ -245,10 +266,10 @@ Skills 模板中的 skills-seed 生成说明现在受内部默认值控制，默
 
 #### `parallelism` 说明
 
-1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次；每个批次使用独立 runtime 调用，结果回到主流程后按议程顺序合并和 checkpoint。
+1. `project` 模式下，`agent.parallelism > 1` 时，`learn current` 会并发分析独立证据焦点批次，已保存分析结果的审查可与其他批次交错执行；每个结果回到主流程后逐项 checkpoint，最终知识按议程顺序排列。
 2. `workspace` 模式下，自动值为子项目数，上限 `6`。
 3. 设置为大于 `0` 的数字时，使用该数字作为并发上限。
-4. workspace 子项目任务通过 goroutine worker 池执行；子项目配置控制其焦点调度，但所有真实 Agent 调用仍受根配置的共享额度约束，知识审查在子项目之间也保持串行。
+4. workspace 子项目任务通过 goroutine worker 池执行；子项目配置控制其焦点调度，但所有真实 Agent 调用仍受根配置的共享额度约束。独立分析与审查可以交错运行，同一运行状态的检查点仍串行提交。
 
 #### `retry` 说明
 
@@ -298,15 +319,14 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 
 ### `.skills-seed` 目录结构
 
-`.skills-seed/store/` 是持久化数据目录，不应删除；`.skills-seed/cache/` 是可重建缓存；`.skills-seed/runtime/` 只保存日志、渲染 prompt、Agent 输出和临时输入等运行时产物，可以在不需要排障时删除。
+`.skills-seed/store/` 是持久化数据目录，不应删除；`.skills-seed/cache/` 保存可恢复命令状态；`.skills-seed/runtime/` 保存按需开启的文件日志、渲染 prompt、Agent 输出和临时输入等运行时产物，可以在不需要排障时删除。初始化不会预建 `runtime/`；提示词输入目录仅在确实需要写入输入文件时创建，直接内联的输入不会留下空目录。关闭文件日志只影响 `runtime/logs/`，其他运行产物仍按需写入。
 
 | 路径 | 作用 |
 |---|---|
 | `.skills-seed/store/project.db` | patterns、质量指标、文件指纹等索引数据 |
 | `.skills-seed/store/documents/` | 画像、规范、状态和变更记录等可读 JSON 文档 |
-| `.skills-seed/cache/snapshots/` | 可重建的文件快照缓存 |
 | `.skills-seed/cache/commands/<command>/state.json` | 未完成命令的可恢复状态，包括尚未入库的焦点分析结果；全部持久化后自动清除，可删除并重新检测和规划 |
-| `.skills-seed/runtime/logs/` | 运行日志 |
+| `.skills-seed/runtime/logs/` | 显式设置 `logging.enabled: true` 后写入的文件日志 |
 | `.skills-seed/runtime/rendered-prompts/` | 渲染后的 prompt 和 manifest |
 | `.skills-seed/runtime/agent-outputs/` | Agent 输出归档 |
 | `.skills-seed/runtime/` | 可重建运行时总目录；`skills-seed clear runtime` 会删除它，`runtime.cleanup_before_reanalysis` 控制重新分析前是否自动清理 |
@@ -364,6 +384,7 @@ skills-seed workflow --name release --content "# 发布流程\n\n- 发布前检�
 
 | 字段 | 默认值 | 说明 |
 |---|---:|---|
+| `enabled` | `false` | 是否写入 runtime 文件日志；终端输出、运行记录与检查点仍正常工作 |
 | `level` | `DEBUG` | 日志级别：`DEBUG`、`INFO`、`WARN`、`ERROR` |
 | `logs_path` | `runtime/logs` | 日志目录，相对 `.skills-seed` |
 | `max_log_files` | `30` | 最多保留的日志文件数量，超过后自动清理旧日志 |

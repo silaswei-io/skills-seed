@@ -39,3 +39,5 @@ AGENTS.md
 .test/quality/cache/
 .test/quality/reports/
 .test/quality/runtime/
+
+/internal/codegraph/assets/runtime.zip

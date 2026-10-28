@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// NormalizeInvocationError 将 CommandContext 的进程信号还原成调用超时或取消语义。
-func NormalizeInvocationError(runErr, contextErr error, timeout time.Duration) error {
+// NormalizeInvocationError 将进程信号还原成超时或取消语义；elapsed 是实际调用耗时，包含父上下文提前到期。
+func NormalizeInvocationError(runErr, contextErr error, elapsed time.Duration) error {
 	switch contextErr {
 	case context.DeadlineExceeded:
-		return fmt.Errorf("agent invocation timed out after %s: %w", timeout, contextErr)
+		return fmt.Errorf("agent invocation timed out after %s: %w", elapsed, contextErr)
 	case context.Canceled:
 		return fmt.Errorf("agent invocation canceled: %w", contextErr)
 	default:

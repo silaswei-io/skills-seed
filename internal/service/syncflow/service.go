@@ -65,6 +65,7 @@ func (s Service) Run(ctx context.Context, req Request) (domain.LearnCurrentResul
 		"Patterns": result.Summary.PatternsFound,
 		"Saved":    result.Summary.PatternsSaved,
 		"Duration": time.Since(startedAt).Round(time.Second),
+		"Pending":  result.Summary.PendingFiles,
 	}))
 	RecordLearnSummary(req.Change, result)
 
@@ -85,7 +86,7 @@ func RunAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generat
 			change.Detail(i18n.Get("ChangeLogGenerateSkippedNoChanges"))
 		}
 		logger.Info(i18n.Get("SyncGenerateSkippedNoChanges"))
-		logger.Info(i18n.Get("SyncComplete"))
+		logCompletion(result.Summary)
 		return nil
 	}
 
@@ -100,13 +101,25 @@ func RunAfterLearn(result domain.LearnCurrentResult, outputMissing bool, generat
 		change.Detail(i18n.Get("ChangeLogGenerateCompletedAll"))
 	}
 
-	logger.Info(i18n.Get("SyncComplete"))
+	logCompletion(result.Summary)
 	return nil
+}
+
+// logCompletion 区分已保存的阶段产物与完整语义学习，避免降级生成被显示为全部完成。
+func logCompletion(summary domain.LearnCurrentSummary) {
+	if summary.PendingFiles > 0 {
+		logger.Warn(i18n.GetWithParams("SyncPartial", map[string]interface{}{"Pending": summary.PendingFiles}))
+		return
+	}
+	logger.Info(i18n.Get("SyncComplete"))
 }
 
 // ShouldGenerateAfterLearn 判断学习结果是否需要触发生成。
 func ShouldGenerateAfterLearn(result domain.LearnCurrentResult) bool {
 	summary := result.Summary
+	if summary.NavigationUpdated {
+		return true
+	}
 	if summary.Projects > 0 {
 		return summary.ChangedProjects > 0 || summary.WorkspaceChanged
 	}

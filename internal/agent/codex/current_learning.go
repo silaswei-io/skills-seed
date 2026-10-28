@@ -19,12 +19,12 @@ func (c *CodexAgent) InvokeStructured(ctx context.Context, in agent.StructuredIn
 	return agent.StructuredResult{Output: output, Conversation: conversation}, err
 }
 
-func (c *CodexAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	return learning.PlanLearningAgenda(ctx, c, req)
-}
-
 func (c *CodexAgent) NormalizePatterns(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	return learning.NormalizePatterns(ctx, c, req)
+}
+
+func (c *CodexAgent) ScreenSemanticGaps(ctx context.Context, req *agent.SemanticScreenRequest) (*agent.SemanticScreenResult, error) {
+	return learning.ScreenSemanticGaps(ctx, c, req)
 }
 
 func (c *CodexAgent) ReviewKnowledge(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {

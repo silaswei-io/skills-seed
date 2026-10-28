@@ -262,19 +262,9 @@ func NormalizeLearningMode(mode string) LearningMode {
 type CurrentLearningConfig struct {
 	Mode             LearningMode           `yaml:"mode"`              // 学习模式：fast、normal、deep
 	PatternAdmission PatternAdmissionConfig `yaml:"pattern_admission"` // 模式候选入库阈值
-	Agenda           AgendaConfig           `yaml:"agenda"`            // 证据议程的确定性收敛配置
 	Structural       StructuralConfig       `yaml:"structural"`        // 结构化上下文配置
 
 	defaultsApplied bool `yaml:"-"`
-}
-
-// AgendaConfig 控制 AI 议程未分配路径的确定性兜底边界。
-type AgendaConfig struct {
-	FallbackPathsPerFocus int `yaml:"fallback_paths_per_focus"` // 每个兜底焦点最多携带的输入路径数
-}
-
-func defaultAgendaConfig() AgendaConfig {
-	return AgendaConfig{FallbackPathsPerFocus: 256}
 }
 
 // PatternAdmissionConfig 控制当前代码候选模式进入模式库的最低置信度。
@@ -290,7 +280,6 @@ func defaultCurrentLearningConfig() CurrentLearningConfig {
 			MinConfidence:               0.75,
 			MinSingleEvidenceConfidence: 0.85,
 		},
-		Agenda:          defaultAgendaConfig(),
 		Structural:      defaultStructuralConfig(),
 		defaultsApplied: true,
 	}
@@ -308,8 +297,9 @@ func (c *CurrentLearningConfig) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-// LoggingConfig 控制命令运行日志的级别、目录和保留数量。
+// LoggingConfig 控制命令运行文件日志的开关、级别、目录和保留数量。
 type LoggingConfig struct {
+	Enabled     bool   `yaml:"enabled"`       // 是否写入 runtime 文件日志；默认关闭
 	Level       string `yaml:"level"`         // 日志级别：DEBUG, INFO, WARN, ERROR
 	LogsPath    string `yaml:"logs_path"`     // 日志路径（相对于 .skills-seed 目录）
 	MaxLogFiles int    `yaml:"max_log_files"` // 最大日志文件数量
@@ -611,9 +601,6 @@ func normalizeLearningConfig(cfg *Config) {
 	}
 	cfg.Learning.Current.Mode = NormalizeLearningMode(string(cfg.Learning.Current.Mode))
 	cfg.Learning.Current.PatternAdmission = normalizePatternAdmissionConfig(cfg.Learning.Current.PatternAdmission)
-	if cfg.Learning.Current.Agenda.FallbackPathsPerFocus <= 0 {
-		cfg.Learning.Current.Agenda = defaultAgendaConfig()
-	}
 	if cfg.Learning.Current.Structural.MaxSymbols <= 0 {
 		cfg.Learning.Current.Structural.MaxSymbols = 30
 	}

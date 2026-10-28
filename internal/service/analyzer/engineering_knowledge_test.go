@@ -20,12 +20,14 @@ func TestEngineeringKnowledgePathsCollectsAuthorityFilesIndependently(t *testing
 		"nested/Taskfile.yml",
 		"internal/service/service.go",
 		".agents/skills/generated/AGENTS.md",
-		".skills-seed/cache/snapshots/AGENTS.md",
+		".skills-seed/cache/ignored/AGENTS.md",
 		".skills-seed/rules/node_modules/dependency/AGENTS.md",
 		".skills-seed/store/Makefile",
 		".skills-seed/workflows/release/AGENTS.md",
 		".skills-seed/runtime/AGENTS.md",
 		"vendor/dependency/AGENTS.md",
+		".test/quality/cache/dependency/AGENTS.md",
+		".codegraph/CLAUDE.md",
 		"packages/example/node_modules/dependency/AGENTS.md",
 		"nested/project/.skills-seed/rules/foundation/RULE.md",
 	}
@@ -35,7 +37,7 @@ func TestEngineeringKnowledgePathsCollectsAuthorityFilesIndependently(t *testing
 		require.NoError(t, os.WriteFile(fullPath, []byte(path), 0o644))
 	}
 
-	paths, err := engineeringKnowledgePaths(root)
+	paths, err := EngineeringKnowledgePaths(root)
 
 	require.NoError(t, err)
 	require.Equal(t, []string{

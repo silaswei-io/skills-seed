@@ -6,23 +6,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/domain"
 )
 
-// ParsePlanLearningAgendaResult 解析源码证据学习议程规划结果。
-func ParsePlanLearningAgendaResult(output string) (*agent.PlanLearningAgendaResult, error) {
-	var payload aicontract.PlanLearningAgendaOutput
-	if err := parseJSONPayload(output, &payload); err != nil {
-		return nil, err
-	}
-	result := &agent.PlanLearningAgendaResult{
-		Focuses:      evidenceFocusesToDomain(payload.Focuses),
-		SkippedPaths: make([]agent.LearningPathSkip, 0, len(payload.SkippedPaths)),
-		Reason:       payload.Reason,
-	}
-	for _, skipped := range payload.SkippedPaths {
-		result.SkippedPaths = append(result.SkippedPaths, agent.LearningPathSkip{Path: skipped.Path, Reason: skipped.Reason})
-	}
-	return result, nil
-}
-
 // ParseNormalizePatternsResult 解析当前学习模式合并优化结果。
 func ParseNormalizePatternsResult(output string) (*agent.NormalizePatternsResult, error) {
 	var payload aicontract.NormalizePatternsOutput
@@ -90,24 +73,6 @@ func ParseWorkspaceSpec(output string) (*domain.WorkspaceSpec, error) {
 		spec.LoadMultipleSkillsWhen = []domain.WorkspaceLoadMultipleSkill{}
 	}
 	return &spec, nil
-}
-
-func evidenceFocusesToDomain(focuses []aicontract.EvidenceFocusOutput) []domain.EvidenceFocus {
-	out := make([]domain.EvidenceFocus, len(focuses))
-	for i, unit := range focuses {
-		out[i] = domain.EvidenceFocus{
-			ID:            unit.ID,
-			Name:          unit.Name,
-			RouteTerms:    stringsOrEmpty(unit.RouteTerms),
-			Attributes:    stringsOrEmpty(unit.Attributes),
-			RiskSignals:   stringsOrEmpty(unit.RiskSignals),
-			AnalysisDepth: unit.AnalysisDepth,
-			EntryPaths:    stringsOrEmpty(unit.EntryPaths),
-			RelatedPaths:  stringsOrEmpty(unit.RelatedPaths),
-			ScopeReason:   unit.ScopeReason,
-		}
-	}
-	return out
 }
 
 func workspaceProfileToDomain(profile aicontract.WorkspaceProfileOutput) domain.WorkspaceProfile {

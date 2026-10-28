@@ -1,5 +1,7 @@
 # 快速开始
 
+默认 `sync` / `learn current` 先用内置 CodeGraph 本地扫描，再按已有知识证据变化和本地调用关系选择关键语义缺口。候选按重要性顺序和证据容量动态组批，沿用独立审核和检查点恢复。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](Learning-and-Sync.md)。
+
 本页完成一次单项目初始化。workspace 请阅读 [Workspace](Workspace.md)。
 
 > **适用场景：** 你准备第一次为已有 Git 项目生成 Skills，或需要重新确认首次初始化的最短路径。

@@ -2,9 +2,8 @@
 //
 // 本包实现项目结构分析和当前代码学习上下文分析功能
 //   - AnalyzeProject: 分析项目结构和特点
-//   - PlanLearningAgenda: 为当前代码学习规划证据焦点
 //   - AnalyzeCurrentCodebaseBatch: 用独立 runtime 调用提取模式
-//   - AnalyzeCurrentDeltaBatch: 基于 diff 判断知识变化
+//   - AnalyzeCurrentDeltaBatch: 基于当前源码和既有知识判断变化
 //
 // 服务职责
 //   - 调用 AI Agent 进行代码分析
@@ -30,7 +29,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/projectpath"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
 	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
-	"github.com/silaswei-io/skills-seed/internal/service/snapshotflow"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 	"github.com/silaswei-io/skills-seed/internal/utils/pathx"
@@ -39,11 +37,10 @@ import (
 // AnalyzerService 代码分析服务
 // 职责：分析代码、提取模式、分析项目结构
 type AnalyzerService struct {
-	agent               agent.Agent
-	configRepo          config.Reader
-	symbolResolver      sourcecode.Resolver
-	structuralCollector structuralCollector
-	maintainedGuidance  maintained.Provider
+	agent              agent.Agent
+	configRepo         config.Reader
+	symbolResolver     sourcecode.Resolver
+	maintainedGuidance maintained.Provider
 }
 
 // NewAnalyzerService 创建分析服务
@@ -57,12 +54,6 @@ func NewAnalyzerService(ag agent.Agent, configRepo config.Reader, guidance ...ma
 		configRepo:     configRepo,
 		symbolResolver: sourcecode.NewResolver(structuralConfig),
 	}
-	if configRepo != nil {
-		cfg := structuralConfig
-		if cfg.Enabled {
-			svc.structuralCollector = newStructuralCollector(cfg)
-		}
-	}
 	if len(guidance) > 0 {
 		svc.maintainedGuidance = guidance[0]
 	}
@@ -73,36 +64,8 @@ func (s *AnalyzerService) loadMaintainedGuidance() (maintained.Snapshot, error) 
 	return s.maintainedGuidance.Load()
 }
 
-func (s *AnalyzerService) collectStructuralContext(ctx context.Context, projectRoot string, req structuralContextRequest) (string, error) {
-	if s.configRepo == nil || s.structuralCollector == nil || projectRoot == "" {
-		return "", nil
-	}
-
-	cfg := s.configRepo.GetCurrentLearningConfig().Structural
-	if !cfg.Enabled || len(req.SeedPaths) == 0 {
-		return "", nil
-	}
-
-	collector := s.structuralCollector
-	if policyAware, ok := collector.(*renderedStructuralCollector); ok {
-		collector = policyAware.withPolicy(fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot))
-	}
-	contextText, err := collector.Collect(ctx, projectRoot, req)
-	if err == nil {
-		return contextText, nil
-	}
-
-	logger.Warn(i18n.Get("AnalyzerStructuralCollectFailed"))
-	logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
-		"operation", "analyzer.structural_collect",
-		"project_root", projectRoot,
-		"error", err,
-	)
-	return "", nil
-}
-
-func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, diffFiles []agent.DiffFileRef, mainFiles []string) []string {
-	seeds := make([]string, 0, len(focusPaths)+len(sampleFiles)+len(diffFiles)+len(mainFiles))
+func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, mainFiles []string) []string {
+	seeds := make([]string, 0, len(focusPaths)+len(sampleFiles)+len(mainFiles))
 	seen := make(map[string]bool)
 	add := func(path string) {
 		path = strings.TrimSpace(filepath.ToSlash(path))
@@ -116,9 +79,6 @@ func structuralSeedPaths(focusPaths []string, sampleFiles []agent.SampleFile, di
 		add(path)
 	}
 	for _, file := range sampleFiles {
-		add(file.Path)
-	}
-	for _, file := range diffFiles {
 		add(file.Path)
 	}
 	for _, path := range mainFiles {
@@ -179,11 +139,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 	)
 
 	structuralContext, err := s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
-		ProjectName: req.ProjectName,
-		Language:    req.Language,
-		Purpose:     "project profile analysis",
-		FocusPaths:  req.FocusPaths,
-		SeedPaths:   structuralSeedPaths(req.FocusPaths, nil, nil, req.MainFiles),
+		SeedPaths: structuralSeedPaths(req.FocusPaths, nil, req.MainFiles),
 	})
 	if err != nil {
 		return nil, err
@@ -193,7 +149,7 @@ func (s *AnalyzerService) analyzeProjectProfile(ctx context.Context, req *Analyz
 	}
 	engineeringKnowledge := req.EngineeringKnowledge
 	if engineeringKnowledge == nil {
-		engineeringKnowledge, err = engineeringKnowledgePaths(req.RootPath)
+		engineeringKnowledge, err = EngineeringKnowledgePaths(req.RootPath)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", i18n.Get("AnalyzerCollectEngineeringKnowledgeFailed"), err)
 		}
@@ -377,119 +333,12 @@ type AnalyzeCurrentDeltaBatchResult struct {
 	ProfileRefreshRecommended agent.ProfileRefreshRecommendation
 }
 
-// PlanLearningAgendaRequest 请求按源码证据边界规划当前待学习文件。
-type PlanLearningAgendaRequest struct {
-	ProjectName       string
-	RootPath          string
-	Language          string
-	LearningMode      config.LearningMode
-	FocusPaths        []string
-	StructuralContext string
-	UserContext       string
-}
-
-// LearningAgendaPlan 是带完整输入覆盖回执的学习计划。
-type LearningAgendaPlan struct {
-	Focuses      []domain.EvidenceFocus
-	SkippedPaths []agent.LearningPathSkip
-	Reason       string
-}
-
-// PlanLearningAgenda 按源码证据焦点拆分当前待学习文件。
-func (s *AnalyzerService) PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*LearningAgendaPlan, error) {
-	structuralContext := req.StructuralContext
-	if structuralContext == "" {
-		var err error
-		structuralContext, err = s.collectStructuralContext(ctx, req.RootPath, structuralContextRequest{
-			ProjectName: req.ProjectName,
-			Language:    req.Language,
-			Purpose:     "current codebase learning agenda planning",
-			FocusPaths:  req.FocusPaths,
-			SeedPaths:   req.FocusPaths,
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	maxSymbols := 0
-	if s.configRepo != nil {
-		maxSymbols = s.configRepo.GetCurrentLearningConfig().Structural.MaxSymbols
-	}
-	guidance, err := s.loadMaintainedGuidance()
-	if err != nil {
-		return nil, fmt.Errorf("load user-maintained learning guidance: %w", err)
-	}
-	agentReq := &agent.PlanLearningAgendaRequest{
-		ProjectName:        req.ProjectName,
-		RootPath:           req.RootPath,
-		Language:           req.Language,
-		LearningMode:       req.LearningMode,
-		FocusPaths:         req.FocusPaths,
-		SourceFacts:        planningSourceFacts(ctx, req.RootPath, req.FocusPaths, maxSymbols),
-		StructuralContext:  structuralContext,
-		UserContext:        req.UserContext,
-		MaintainedGuidance: guidance,
-	}
-	result, err := s.agent.PlanLearningAgenda(ctx, agentReq)
-	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
-	}
-	if err := agent.RequireResult(result, "PlanLearningAgenda"); err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
-	}
-	fallbackPathsPerFocus := 0
-	if s.configRepo != nil {
-		fallbackPathsPerFocus = s.configRepo.GetCurrentLearningConfig().Agenda.FallbackPathsPerFocus
-	}
-	agenda, err := reconcileLearningAgenda(req.FocusPaths, result.Focuses, result.SkippedPaths, fallbackPathsPerFocus)
-	if err != nil {
-		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
-	}
-	return &LearningAgendaPlan{
-		Focuses:      agenda.Focuses,
-		SkippedPaths: agenda.Skipped,
-		Reason:       result.Reason,
-	}, nil
-}
-
-func planningSourceFacts(ctx context.Context, projectRoot string, paths []string, maxSymbols int) []agent.PlanningSourceFact {
-	inspected := sourcecode.InspectFiles(ctx, projectRoot, paths)
-	symbolPreviewLimit := 0
-	if maxSymbols > 0 && len(inspected) > 0 {
-		symbolPreviewLimit = max(1, maxSymbols/len(inspected))
-	}
-	facts := make([]agent.PlanningSourceFact, 0, len(inspected))
-	for _, file := range inspected {
-		symbolLimit := len(file.Symbols)
-		if symbolPreviewLimit > 0 {
-			symbolLimit = min(symbolLimit, symbolPreviewLimit)
-		}
-		symbols := make([]agent.PlanningSymbolFact, 0, symbolLimit)
-		for _, symbol := range file.Symbols[:symbolLimit] {
-			symbols = append(symbols, agent.PlanningSymbolFact{
-				Name: symbol.Name,
-				Kind: symbol.Kind,
-				Line: symbol.Line,
-			})
-		}
-		facts = append(facts, agent.PlanningSourceFact{
-			Path:          file.Path,
-			SizeBytes:     file.SizeBytes,
-			LineCount:     file.LineCount,
-			NonBlankLines: file.NonBlankLines,
-			SymbolCount:   len(file.Symbols),
-			Symbols:       symbols,
-		})
-	}
-	return facts
-}
-
 func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, projectRoot, projectName, language string, opts AnalyzeCurrentCodebaseBatchOptions) (*AnalyzeCurrentCodebaseBatchResult, error) {
 	startedAt := time.Now()
 	runContext := opts.RunContext
 	if runContext == nil {
 		var err error
-		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
+		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, AnalyzeCodebaseOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -505,7 +354,6 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 			EvidenceFocus: focus.EvidenceFocus,
 			FocusPaths:    focusPaths,
 			SampleFiles:   filterSampleFilesByFocus(runContext.SampleFiles, evidencePaths),
-			DiffFiles:     filterDiffFilesByFocus(runContext.DiffFiles, evidencePaths),
 		})
 		focusByID[focus.EvidenceFocus.ID] = focus.EvidenceFocus
 		focusByName[focus.EvidenceFocus.Name] = focus.EvidenceFocus
@@ -532,11 +380,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 	}
 
 	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{
-		ProjectName: projectName,
-		Language:    language,
-		Purpose:     "current codebase batch pattern extraction",
-		FocusPaths:  batchFocusPaths(focuses),
-		SeedPaths:   batchSeedPaths(focuses, runContext.MainFiles),
+		SeedPaths: batchSeedPaths(focuses, runContext.MainFiles),
 	})
 	if err != nil {
 		return nil, err
@@ -551,6 +395,9 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 			"error", err,
 		)
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
+	if agent.CurrentLearningSupplement(ctx) != nil && result != nil && result.Assessment != "resolved" {
+		return nil, agent.ErrSupplementUnresolved
 	}
 	if err := agent.RequireResult(result, "AnalyzeCurrentCodebaseBatch"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
@@ -595,7 +442,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		focusResult := mergedResults[requested.EvidenceFocus.ID]
 		patterns := validator.validatePatterns(focusResult.Patterns)
 		out = append(out, AnalyzeCurrentEvidenceResult{
-			Evidence:                  learningEvidence(focuses[index].SampleFiles, focuses[index].DiffFiles, structuralContext),
+			Evidence:                  learningEvidence(focuses[index].SampleFiles, structuralContext),
 			EvidenceFocus:             requested.EvidenceFocus,
 			Patterns:                  patterns,
 			ProfileRefreshRecommended: focusResult.ProfileRefreshRecommended,
@@ -609,13 +456,10 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 	return &AnalyzeCurrentCodebaseBatchResult{Focuses: out, Conversation: result.Conversation}, nil
 }
 
-func learningEvidence(files []agent.SampleFile, diffs []agent.DiffFileRef, structuralContext string) domain.LearningEvidence {
+func learningEvidence(files []agent.SampleFile, structuralContext string) domain.LearningEvidence {
 	evidence := domain.LearningEvidence{StructuralContext: structuralContext}
 	for _, file := range files {
 		evidence.SourcePaths = append(evidence.SourcePaths, file.Path)
-	}
-	for _, diff := range diffs {
-		evidence.DiffPaths = append(evidence.DiffPaths, diff.DiffPath)
 	}
 	return evidence
 }
@@ -896,7 +740,6 @@ type AnalyzeCodebaseOptions struct {
 	SelectedFilesSet   bool
 	KnownPatternsJSON  string
 	KnownPatternsCount int
-	UseSnapshotDiffs   bool
 	RunContext         *CodebaseRunContext
 }
 
@@ -905,26 +748,25 @@ type CodebaseRunContext struct {
 	ProjectStructure string
 	MainFiles        []string
 	SampleFiles      []agent.SampleFile
-	DiffFiles        []agent.DiffFileRef
-	SnapshotFlow     *snapshotflow.Result
 }
 
 // BuildCodebaseRunContext 预收集 learn current 中多个证据焦点可复用的上下文。
 func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRoot, language string, opts AnalyzeCodebaseOptions) (*CodebaseRunContext, error) {
-	structure, _ := s.GetProjectStructure(projectRoot)
-	mainFiles := s.FindMainFiles(projectRoot)
-	sampleFiles := s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
-	var diffFiles []agent.DiffFileRef
-	var snapshotFlow *snapshotflow.Result
-	var err error
+	var structure string
+	var mainFiles []string
+	var sampleFiles []agent.SampleFile
+	if agent.CurrentLearningSupplement(ctx) == nil {
+		structure, _ = s.GetProjectStructure(projectRoot)
+		mainFiles = s.FindMainFiles(projectRoot)
+		sampleFiles = s.collectSampleFilesFromRoots(projectRoot, opts.FocusPaths, language)
+	}
 	focusPaths := projectpath.Relative(projectRoot, opts.FocusPaths)
-	if opts.UseSnapshotDiffs || len(focusPaths) == 0 {
+	if opts.SelectedFilesSet || len(opts.SelectedFiles) > 0 || len(focusPaths) == 0 {
 		selectedFiles := append([]domain.FileInfo(nil), opts.SelectedFiles...)
-		selectionPolicy := fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot)
 		if len(selectedFiles) == 0 && !opts.SelectedFilesSet {
 			selection, selectErr := fileanalysis.SelectFiles(fileanalysis.SelectOptions{
 				Root:          projectRoot,
-				Policy:        selectionPolicy,
+				Policy:        fileanalysis.NewConfiguredSelectionPolicy(s.configRepo, projectRoot),
 				FocusAbsPaths: opts.FocusPaths,
 			})
 			if selectErr != nil {
@@ -932,23 +774,12 @@ func (s *AnalyzerService) BuildCodebaseRunContext(ctx context.Context, projectRo
 			}
 			selectedFiles = selection.Files
 		}
-		snapshotFlow, err = snapshotflow.BuildScopedWithOptions(ctx, projectRoot, selectedFiles, focusPaths, snapshotflow.Options{
-			DiffAllowed: func(path string) bool {
-				return !selectionPolicy.IsExcluded(path)
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		sampleFiles = sampleFilesFromFileInfos(snapshotFlow.AddedFiles)
-		diffFiles = snapshotFlow.DiffFiles
+		sampleFiles = sampleFilesFromFileInfos(selectedFiles)
 	}
 	return &CodebaseRunContext{
 		ProjectStructure: structure,
 		MainFiles:        append([]string(nil), mainFiles...),
 		SampleFiles:      append([]agent.SampleFile(nil), sampleFiles...),
-		DiffFiles:        append([]agent.DiffFileRef(nil), diffFiles...),
-		SnapshotFlow:     snapshotFlow,
 	}, nil
 }
 
@@ -958,23 +789,6 @@ func sampleFilesFromFileInfos(files []domain.FileInfo) []agent.SampleFile {
 		samples = append(samples, agent.SampleFile{Path: file.Path})
 	}
 	return samples
-}
-
-func batchFocusPaths(focuses []agent.AnalyzeCurrentEvidenceFocus) []string {
-	seen := make(map[string]bool)
-	var paths []string
-	for _, focus := range focuses {
-		for _, path := range focus.FocusPaths {
-			path = normalizeRelPath(path)
-			if path == "" || seen[path] {
-				continue
-			}
-			seen[path] = true
-			paths = append(paths, path)
-		}
-	}
-	sort.Strings(paths)
-	return paths
 }
 
 func batchSeedPaths(focuses []agent.AnalyzeCurrentEvidenceFocus, mainFiles []string) []string {
@@ -998,9 +812,6 @@ func batchSeedPaths(focuses []agent.AnalyzeCurrentEvidenceFocus, mainFiles []str
 		for _, file := range focus.SampleFiles {
 			add(file.Path)
 		}
-		for _, file := range focus.DiffFiles {
-			add(file.Path)
-		}
 	}
 	sort.Strings(paths)
 	return paths
@@ -1008,16 +819,6 @@ func batchSeedPaths(focuses []agent.AnalyzeCurrentEvidenceFocus, mainFiles []str
 
 func filterSampleFilesByFocus(files []agent.SampleFile, focusPaths []string) []agent.SampleFile {
 	out := make([]agent.SampleFile, 0, len(files))
-	for _, file := range files {
-		if pathInFocus(file.Path, focusPaths) {
-			out = append(out, file)
-		}
-	}
-	return out
-}
-
-func filterDiffFilesByFocus(files []agent.DiffFileRef, focusPaths []string) []agent.DiffFileRef {
-	out := make([]agent.DiffFileRef, 0, len(files))
 	for _, file := range files {
 		if pathInFocus(file.Path, focusPaths) {
 			out = append(out, file)

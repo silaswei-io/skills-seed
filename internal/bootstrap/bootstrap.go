@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	clearcmd "github.com/silaswei-io/skills-seed/internal/command/clear"
 	cliskillscmd "github.com/silaswei-io/skills-seed/internal/command/cliskills"
+	graphcmd "github.com/silaswei-io/skills-seed/internal/command/codegraph"
 	"github.com/silaswei-io/skills-seed/internal/command/generate"
 	"github.com/silaswei-io/skills-seed/internal/command/hook"
 	initcmd "github.com/silaswei-io/skills-seed/internal/command/init"
@@ -37,6 +40,16 @@ import (
 
 // Run 初始化运行时依赖并执行命令行入口
 func Run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	defer func() { close(done); stop() }()
+	go func() {
+		select {
+		case <-ctx.Done():
+			stop()
+		case <-done:
+		}
+	}()
 	seedPath, err := projectpath.FindSeedPath()
 	hasSeedDir := err == nil && seedPath != ""
 
@@ -48,7 +61,7 @@ func Run() error {
 	if !commandNeedsProjectRuntime(args) {
 		rootCmd := createRootCmd()
 		registerCommands(rootCmd, nil)
-		return rootCmd.Execute()
+		return rootCmd.ExecuteContext(ctx)
 	}
 
 	var cont *container.Container
@@ -65,7 +78,7 @@ func Run() error {
 
 	rootCmd := createRootCmd()
 	registerCommands(rootCmd, cont)
-	return rootCmd.Execute()
+	return rootCmd.ExecuteContext(ctx)
 }
 
 func initI18n(seedPath string, hasSeedDir bool) error {
@@ -102,6 +115,9 @@ func initContainerAndLogger(seedPath string) (*container.Container, error) {
 
 func initLogger(seedPath string, cont *container.Container) error {
 	loggingConfig := cont.GetLoggingConfig()
+	if !loggingConfig.Enabled {
+		return logger.Close()
+	}
 	logDir := filepath.Join(seedPath, loggingConfig.LogsPath)
 	logLevel := logger.ParseLevel(loggingConfig.Level)
 
@@ -189,14 +205,16 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 		Generate: generate.RunGenerate,
 		GenerateChild: func(cont *container.Container, opts synccmd.GenerateChildOptions) error {
 			loggingConfig := cont.ConfigRepo.GetLoggingConfig()
-			logDir := filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
-			return logger.WithScopedLog(context.Background(), logDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, func(context.Context, string) error {
+			generateChild := func(context.Context, string) error {
 				return generate.RunGenerateQuietWithProgress(cont, generator.GenerateProgressHooks{
-					OnStepStart:    opts.OnStepStart,
-					OnStepUpdate:   opts.OnStepUpdate,
-					OnStepComplete: opts.OnStepComplete,
+					OnStepStart: opts.OnStepStart, OnStepUpdate: opts.OnStepUpdate, OnStepComplete: opts.OnStepComplete,
 				})
-			})
+			}
+			if !loggingConfig.Enabled {
+				return generateChild(context.Background(), "")
+			}
+			logDir := filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
+			return logger.WithScopedLog(context.Background(), logDir, "generate", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, generateChild)
 		},
 		LearnWorkspaceRelationships: learn.RunWorkspaceRelationships,
 		GenerateWorkspaceRoot:       generate.RunGenerateWorkspaceRoot,
@@ -204,6 +222,7 @@ func registerCommands(rootCmd *cobra.Command, cont *container.Container) {
 	rootCmd.AddCommand(workflowcmd.Cmd(cont))
 	rootCmd.AddCommand(rulecmd.Cmd(cont))
 	rootCmd.AddCommand(learn.Cmd(cont))
+	rootCmd.AddCommand(graphcmd.Cmd(cont))
 	rootCmd.AddCommand(generate.Cmd(cont))
 	rootCmd.AddCommand(logcmd.Cmd())
 	rootCmd.AddCommand(patternscmd.Cmd(cont))
@@ -254,11 +273,12 @@ var projectRuntimeExcludedCommands = map[string]struct{}{
 }
 
 var projectRuntimeCommands = map[string]struct{}{
-	"add":      {},
-	"reset":    {},
-	"sync":     {},
-	"workflow": {},
-	"rule":     {},
+	"codegraph": {},
+	"add":       {},
+	"reset":     {},
+	"sync":      {},
+	"workflow":  {},
+	"rule":      {},
 }
 
 var projectRuntimeSubcommands = map[string]map[string]struct{}{

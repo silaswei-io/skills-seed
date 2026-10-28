@@ -41,22 +41,6 @@ func (r *Renderer) Render(ctx context.Context, plan *Plan) error {
 	if err := os.MkdirAll(plan.OutputPath, 0755); err != nil {
 		return err
 	}
-	for _, dir := range plan.CreateDirs {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Join(plan.OutputPath, dir), 0755); err != nil {
-			return err
-		}
-	}
-	for _, path := range plan.RemovePaths {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if err := os.RemoveAll(filepath.Join(plan.OutputPath, path)); err != nil {
-			return err
-		}
-	}
 	for _, file := range plan.Files {
 		if err := ctx.Err(); err != nil {
 			return err

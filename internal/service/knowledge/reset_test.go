@@ -25,7 +25,6 @@ func TestResetAllScopeMovesKnowledgeAndPreservesConfiguration(t *testing.T) {
 		"workspace-profile",
 		"workspace-spec",
 		"child-project-profiles",
-		"file-snapshots",
 		"command-checkpoints",
 		"learning-history",
 	}, result.Resources)
@@ -38,7 +37,6 @@ func TestResetAllScopeMovesKnowledgeAndPreservesConfiguration(t *testing.T) {
 		seedLayout.WorkspaceProfile(),
 		seedLayout.WorkspaceSpec(),
 		seedLayout.StoreDocuments("projects"),
-		seedLayout.Snapshots(),
 		seedLayout.CommandStates(),
 		seedLayout.ChangeLog(),
 	} {
@@ -50,7 +48,6 @@ func TestResetAllScopeMovesKnowledgeAndPreservesConfiguration(t *testing.T) {
 	require.FileExists(t, filepath.Join(result.BackupPath, "rules", "security", "RULE.md"))
 	require.FileExists(t, filepath.Join(result.BackupPath, "workflows", "release", "WORKFLOW.md"))
 	require.FileExists(t, filepath.Join(result.BackupPath, "store", "documents", "project-profile.json"))
-	require.FileExists(t, filepath.Join(result.BackupPath, "cache", "snapshots", "files.json"))
 }
 
 func TestResetSelectedScopeLeavesOtherKnowledgeActive(t *testing.T) {
@@ -60,9 +57,8 @@ func TestResetSelectedScopeLeavesOtherKnowledgeActive(t *testing.T) {
 
 	result, err := Reset(seedPath, Scope{Patterns: true, Cache: true})
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{"patterns", "file-snapshots", "command-checkpoints"}, result.Resources)
+	require.ElementsMatch(t, []string{"patterns", "command-checkpoints"}, result.Resources)
 	require.NoFileExists(t, seedLayout.ProjectDB())
-	require.NoDirExists(t, seedLayout.Snapshots())
 	require.NoDirExists(t, seedLayout.CommandStates())
 	require.FileExists(t, filepath.Join(seedLayout.Rules(), "security", "RULE.md"))
 	require.FileExists(t, filepath.Join(seedLayout.Workflows(), "release", "WORKFLOW.md"))
@@ -102,7 +98,6 @@ func writeResetFixture(t *testing.T, seedPath string, seedLayout layout.Layout) 
 		seedLayout.WorkspaceProfile():                                                       "{}\n",
 		seedLayout.WorkspaceSpec():                                                          "{}\n",
 		filepath.Join(seedLayout.StoreDocuments("projects"), "api", "project-profile.json"): "{}\n",
-		filepath.Join(seedLayout.Snapshots(), "files.json"):                                 "{}\n",
 		filepath.Join(seedLayout.CommandStates(), "sync", "state.json"):                     "{}\n",
 		seedLayout.ChangeLog():                                                              "[]\n",
 	} {

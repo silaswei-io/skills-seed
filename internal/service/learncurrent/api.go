@@ -2,20 +2,16 @@ package learncurrent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/changelog"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/runjournal"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
-)
-
-const (
-	learnCurrentProfileAuto    = "auto"
-	learnCurrentProfileSkip    = "skip"
-	learnCurrentProfileRefresh = "refresh"
 )
 
 var sleepAfterWorkspaceChildStep = time.Sleep
@@ -23,15 +19,15 @@ var sleepAfterWorkspaceChildStep = time.Sleep
 const (
 	learnCurrentProgressSubjectMaxRunes = 36
 	learnCurrentRunningSubjectMaxRunes  = 18
-	// learnCurrentProjectStepTotal 是项目级 learn current 在控制台展示的顶层阶段数。
-	// 阶段：准备 → 检测/恢复 → 议程规划 → 分析审查 → 规范化入库 → 画像刷新。
+	// learnCurrentProjectStepTotal 是项目级学习的顶层阶段数；语义批次仅作为阶段明细。
+	// 本地阶段：索引 → 过滤 → 语义规划 → 结构提交 → 语义补充 → 状态收尾。
 	learnCurrentProjectStepTotal = 6
 )
 
 type learnCurrentOptions struct {
+	semantic       bool
 	language       string
 	focusPaths     []string
-	profileMode    string
 	contextText    string
 	contextPath    []string
 	userContext    string
@@ -58,9 +54,9 @@ type CurrentRunOptions struct {
 
 // Flags 是 CLI 入口解析后的 learn current 参数。
 type Flags struct {
+	Semantic    bool // 仅对显式焦点执行 AI 语义学习。
 	Language    string
 	FocusPaths  []string
-	ProfileMode string
 	ContextText string
 	ContextPath []string
 	Force       bool
@@ -69,9 +65,9 @@ type Flags struct {
 // RunWithFlags 供 CLI 调用的完整入口。
 func RunWithFlags(ctx context.Context, cont *container.Container, flags Flags) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(ctx, cont, learnCurrentOptions{
+		semantic:    flags.Semantic,
 		language:    flags.Language,
 		focusPaths:  flags.FocusPaths,
-		profileMode: flags.ProfileMode,
 		contextText: flags.ContextText,
 		contextPath: flags.ContextPath,
 		force:       flags.Force,
@@ -87,15 +83,13 @@ func RecordSummary(change *changelog.Builder, result domain.LearnCurrentResult) 
 // Run 从当前代码库学习，并返回学习摘要。
 func Run(ctx context.Context, cont *container.Container) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(ctx, cont, learnCurrentOptions{
-		profileMode: learnCurrentProfileAuto,
-		scopeKind:   runjournal.ScopeProject,
+		scopeKind: runjournal.ScopeProject,
 	})
 }
 
 // RunWithContext 从当前代码库学习，附加一次性用户上下文。
 func RunWithContext(ctx context.Context, cont *container.Container, userContext string) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(ctx, cont, learnCurrentOptions{
-		profileMode: learnCurrentProfileAuto,
 		userContext: userContext,
 		scopeKind:   runjournal.ScopeProject,
 	})
@@ -104,7 +98,6 @@ func RunWithContext(ctx context.Context, cont *container.Container, userContext 
 // RunWithStateScope 从当前代码库学习，并使用指定恢复状态 scope。
 func RunWithStateScope(ctx context.Context, cont *container.Container, stateScope string, userContext string) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(ctx, cont, learnCurrentOptions{
-		profileMode: learnCurrentProfileAuto,
 		userContext: userContext,
 		stateScope:  stateScope,
 		scopeKind:   runjournal.ScopeProject,
@@ -114,7 +107,6 @@ func RunWithStateScope(ctx context.Context, cont *container.Container, stateScop
 // RunWithStateScopeOptions 从当前代码库学习，并允许调用方指定运行选项。
 func RunWithStateScopeOptions(ctx context.Context, cont *container.Container, stateScope string, userContext string, opts CurrentRunOptions) (domain.LearnCurrentResult, error) {
 	return runLearnCurrent(ctx, cont, learnCurrentOptions{
-		profileMode:    learnCurrentProfileAuto,
 		userContext:    userContext,
 		stateScope:     stateScope,
 		scopeKind:      opts.ScopeKind,
@@ -127,9 +119,6 @@ func RunWithStateScopeOptions(ctx context.Context, cont *container.Container, st
 }
 
 func runLearnCurrent(ctx context.Context, cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
-	if opts.profileMode == "" {
-		opts.profileMode = learnCurrentProfileAuto
-	}
 	if opts.scopeKind == "" {
 		opts.scopeKind = runjournal.ScopeProject
 	}
@@ -140,6 +129,9 @@ func runLearnCurrent(ctx context.Context, cont *container.Container, opts learnC
 		}
 		opts.userContext = userContext
 	}
+	if opts.semantic && cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
+		return domain.LearnCurrentResult{}, fmt.Errorf("%s", i18n.Get("LearnSemanticProjectRequired"))
+	}
 	if cont.ConfigRepo.GetProjectConfig().Mode == domain.ModeWorkspace {
 		return runLearnWorkspaceCurrent(ctx, cont, opts)
 	}
@@ -148,6 +140,7 @@ func runLearnCurrent(ctx context.Context, cont *container.Container, opts learnC
 
 func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts learnCurrentOptions) (domain.LearnCurrentResult, error) {
 	result, err := runLearnCurrentProjectWithOptions(ctx, cont, learnCurrentProjectOptions{
+		semantic:         opts.semantic,
 		showProgress:     !opts.quiet,
 		showDetailedLogs: !opts.quiet,
 		onStepStart:      opts.onStepStart,
@@ -156,7 +149,6 @@ func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts
 		userContext:      opts.userContext,
 		language:         opts.language,
 		focusPaths:       opts.focusPaths,
-		profileMode:      opts.profileMode,
 		stateScope:       opts.stateScope,
 		scopeKind:        opts.scopeKind,
 		force:            opts.force,
@@ -165,15 +157,17 @@ func runLearnCurrentProject(ctx context.Context, cont *container.Container, opts
 		return domain.LearnCurrentResult{}, err
 	}
 	summary := domain.LearnCurrentSummary{
-		ChangedFiles:    result.changedCount,
-		DeletedFiles:    result.deletedCount,
-		SkippedFiles:    result.skippedCount,
-		PatternsFound:   result.patternsCount,
-		PatternsSaved:   result.savedCount,
-		PatternsRetired: result.retiredCount,
-		PatternsDropped: result.droppedCount,
-		DropReasons:     dropReasonSummaries(result.dropped),
-		NoFileChanges:   result.skipped,
+		NavigationUpdated: result.navigationUpdated,
+		PendingFiles:      result.pendingCount,
+		ChangedFiles:      result.changedCount,
+		DeletedFiles:      result.deletedCount,
+		SkippedFiles:      result.skippedCount,
+		PatternsFound:     result.patternsCount,
+		PatternsSaved:     result.savedCount,
+		PatternsRetired:   result.retiredCount,
+		PatternsDropped:   result.droppedCount,
+		DropReasons:       dropReasonSummaries(result.dropped),
+		NoFileChanges:     result.skipped,
 	}
 	return domain.LearnCurrentResult{Summary: summary}, nil
 }
@@ -208,6 +202,7 @@ func dropReasonSummaries(dropped []patternnorm.Drop) []string {
 }
 
 type learnCurrentProjectOptions struct {
+	semantic           bool
 	showProgress       bool
 	showDetailedLogs   bool
 	userContext        string
@@ -217,22 +212,23 @@ type learnCurrentProjectOptions struct {
 	onStepUpdate       func(label string)
 	language           string
 	focusPaths         []string
-	profileMode        string
 	stateScope         string
 	scopeKind          runjournal.ScopeKind
 	force              bool
 }
 
 type learnCurrentProjectResult struct {
-	projectName   string
-	changedCount  int
-	deletedCount  int
-	skippedCount  int
-	patternsCount int
-	savedCount    int
-	retiredCount  int
-	droppedCount  int
-	dropped       []patternnorm.Drop
-	skipped       bool
-	duration      time.Duration
+	navigationUpdated bool
+	pendingCount      int
+	projectName       string
+	changedCount      int
+	deletedCount      int
+	skippedCount      int
+	patternsCount     int
+	savedCount        int
+	retiredCount      int
+	droppedCount      int
+	dropped           []patternnorm.Drop
+	skipped           bool
+	duration          time.Duration
 }

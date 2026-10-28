@@ -2,6 +2,10 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 
 	"github.com/silaswei-io/skills-seed/internal/container"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
@@ -76,7 +80,7 @@ func hasSyncCommandState(ctx context.Context, seedPath, stateScope string) (bool
 		return true, nil
 	}
 	if err == commandstate.ErrStateNotFound {
-		return false, nil
+		return hasPendingLocalSupplement(seedPath)
 	}
 	return false, err
 }
@@ -85,11 +89,31 @@ func hasResumableSyncCommandState(ctx context.Context, seedPath, stateScope stri
 	state, err := commandstate.NewRepository(seedPath, stateScope).Load(ctx)
 	if err != nil {
 		if err == commandstate.ErrStateNotFound {
-			return false, nil
+			return hasPendingLocalSupplement(seedPath)
 		}
 		return false, err
 	}
-	return state != nil && len(state.Files)+len(state.Deleted) > 0 && len(state.Agenda.Focuses) > 0, nil
+	if state != nil && len(state.Files)+len(state.Deleted) > 0 && len(state.Agenda.Focuses) > 0 {
+		return true, nil
+	}
+	return hasPendingLocalSupplement(seedPath)
+}
+
+func hasPendingLocalSupplement(seedPath string) (bool, error) {
+	data, err := os.ReadFile(filepath.Join(seedPath, "runtime", "local-supplement.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var status struct {
+		Pending []json.RawMessage `json:"pending"`
+	}
+	if err := json.Unmarshal(data, &status); err != nil {
+		return false, err
+	}
+	return len(status.Pending) > 0, nil
 }
 
 func hasSyncCommandStateForTarget(ctx context.Context, cont *container.Container, stateScope string) (bool, error) {

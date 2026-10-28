@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/silaswei-io/skills-seed/internal/codegraph"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/knowledge"
@@ -39,7 +40,10 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 	if snapshot.RenderProfile == nil {
 		return nil, fmt.Errorf("%s", i18n.Get("GenerateProjectProfileMissing"))
 	}
-	profile := snapshot.RenderProfile
+	profileCopy := *snapshot.RenderProfile
+	profileCopy.BusinessMethods = reviewedBusinessMethods(profileCopy.BusinessMethods, snapshot.Patterns)
+	profile := &profileCopy
+	snapshot.RenderProfile = profile
 	patterns := snapshot.Patterns
 	if skillName == "" {
 		skillName = skillgen.GeneratedSkillName(opts.ProjectName)
@@ -64,27 +68,31 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 		SkillDescription:    triggerDescription,
 		Language:            templateLanguage,
 		HasKnowledge:        hasKnowledge,
+		HasNavigation:       opts.Navigation != nil && len(opts.Navigation.Files)+len(opts.Navigation.Unindexed)+len(opts.Navigation.AuthorityPaths) > 0,
 		HasPatterns:         len(patterns) > 0,
 		PatternCount:        len(patterns),
-		Categories:          len(summaryResult.CategorySummaries),
 		LastUpdated:         knowledgeUpdatedAt(profile, patterns),
-		KeyInsights:         summaryResult.KeyInsights,
 		References:          references,
 		OverviewReferences:  conditionalProfileReferenceItems(profile, locale, "./references/", references.Enabled),
 		ReferenceGroups:     conditionalCategoryReferenceGroups(patterns, locale, references.Enabled),
-		DevelopmentFocuses:  buildDevelopmentFocuses(patterns),
 		WorkflowReferences:  opts.WorkflowReferences,
 		RuleReferences:      opts.RuleReferences,
-		StateSummaries:      []string{},
 		CommandRules:        commandPolicyRules(profile.EngineeringRules),
 	}
 
 	p := skillgen.NewPlan(outputPath)
 	p.AddFile("SKILL.md", skillgen.CatalogTemplate, "project-skill", data)
 	p.AgentMetadataData = data
+	if opts.Navigation != nil && len(opts.Navigation.Files)+len(opts.Navigation.Unindexed)+len(opts.Navigation.AuthorityPaths) > 0 {
+		var methods []domain.BusinessMethod
+		if hasKnowledge {
+			methods = profile.BusinessMethods
+		}
+		appendNavigation(p, opts.Navigation, methods)
+	}
 
 	if hasKnowledge {
-		if err := b.appendReferenceFiles(p, summaryResult.CategorySummaries, snapshot, references, opts.RuleReferences); err != nil {
+		if err := b.appendReferenceFiles(p, summaryResult.CategorySummaries, snapshot, references, opts.RuleReferences, opts.Navigation); err != nil {
 			logger.DiagnosticError(i18n.Get("LoggerDiagnosticOperationFailed"),
 				"operation", "generator.append_reference_files",
 				"duration", time.Since(startedAt),
@@ -104,7 +112,7 @@ func (b *planBuilder) Build(outputPath string, snapshot verifiedKnowledgeSnapsho
 	return p, nil
 }
 
-func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[string]categorySummary, snapshot verifiedKnowledgeSnapshot, references ReferenceAvailability, ruleReferences []RuleReference) error {
+func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[string]categorySummary, snapshot verifiedKnowledgeSnapshot, references ReferenceAvailability, ruleReferences []RuleReference, index *codegraph.Index) error {
 	patterns := snapshot.Patterns
 	profile := snapshot.RenderProfile
 	startedAt := time.Now()
@@ -114,12 +122,10 @@ func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[strin
 		"patterns_count", len(patterns),
 	)
 
-	p.AddDir("references")
-	p.AddDir("references/patterns")
-	p.RemovePath("references/examples")
-
-	if err := b.appendProjectOverview(p, profile); err != nil {
-		return err
+	if references.ProjectOverview {
+		if err := b.appendProjectOverview(p, profile); err != nil {
+			return err
+		}
 	}
 
 	categoriesWithPatterns := categoryNamesWithPatterns(patterns)
@@ -127,7 +133,11 @@ func (b *planBuilder) appendReferenceFiles(p *skillgen.Plan, summaries map[strin
 		return err
 	}
 	if snapshot.Spec != nil {
-		if err := b.appendProjectSpec(p, snapshot.Spec, references, ruleReferences); err != nil {
+		var authorityPaths []string
+		if index != nil {
+			authorityPaths = index.AuthorityPaths
+		}
+		if err := b.appendProjectSpec(p, snapshot.Spec, references, ruleReferences, authorityPaths); err != nil {
 			return err
 		}
 	}
@@ -156,13 +166,14 @@ func commandPolicyRules(rules []domain.EngineeringRule) []domain.EngineeringRule
 	return out
 }
 
-func (b *planBuilder) appendProjectSpec(p *skillgen.Plan, spec *domain.ProjectSpec, references ReferenceAvailability, ruleReferences []RuleReference) error {
+func (b *planBuilder) appendProjectSpec(p *skillgen.Plan, spec *domain.ProjectSpec, references ReferenceAvailability, ruleReferences []RuleReference, authorityPaths []string) error {
 	filtered := *spec
 	filtered.EngineeringRules = nonResourceEngineeringRules(spec.EngineeringRules)
 	p.AddFile("references/project-spec.md", skillgen.ReferenceTemplate, "project-spec", projectSpecTemplateData{
 		ProjectSpec:    filtered,
 		References:     references,
 		RuleReferences: projectSpecRuleReferences(ruleReferences),
+		AuthorityPaths: authorityPaths,
 	})
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.append_project_spec",
@@ -200,7 +211,6 @@ func (b *planBuilder) appendProjectOverview(p *skillgen.Plan, profile *domain.Pr
 	p.AddFile("references/project-overview.md", skillgen.ProjectOverviewTemplate, "project-overview", data)
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.append_project_overview",
-		"placeholder", false,
 	)
 	return nil
 }
@@ -213,7 +223,6 @@ func (b *planBuilder) appendProfileReferenceFiles(p *skillgen.Plan, profile *dom
 	data := profileReferenceTemplateData{
 		ProjectProfile:      *profile,
 		HasBusinessPatterns: categorySet[string(domain.CategoryBusiness)],
-		HasUtilityPatterns:  categorySet[string(domain.CategoryUtils)],
 		CodeFenceLanguage:   codeFenceLanguage(profile.Language),
 		BusinessMethodIndex: buildBusinessMethodIndex(profile.BusinessMethods, b.skillsLoader.GetLocale()),
 	}
@@ -225,7 +234,6 @@ func (b *planBuilder) appendProfileReferenceFiles(p *skillgen.Plan, profile *dom
 	}{
 		{templateName: "business-methods", outputName: "business-methods.md", enabled: len(profile.BusinessMethods) > 0, data: data},
 		{templateName: "modules", outputName: "modules.md", enabled: len(profile.KeyModules) > 0, data: moduleReferenceData(profile)},
-		{templateName: "common-utils", outputName: "common-utils.md", enabled: len(profile.CommonUtils) > 0, data: data},
 	}
 
 	for _, file := range files {
@@ -239,6 +247,16 @@ func (b *planBuilder) appendProfileReferenceFiles(p *skillgen.Plan, profile *dom
 			"reference", file.templateName,
 			"path", outputPath,
 		)
+	}
+	if len(data.BusinessMethodIndex.Groups) > 0 {
+		for _, group := range data.BusinessMethodIndex.Groups {
+			for _, method := range group.Methods {
+				p.AddFile(filepath.Join("references", "business-methods", filepath.Base(method.ReferencePath)), skillgen.RelativeTemplate, "project/references/business-method-detail", struct {
+					Method            businessMethodView
+					CodeFenceLanguage string
+				}{Method: method, CodeFenceLanguage: data.CodeFenceLanguage})
+			}
+		}
 	}
 	return nil
 }
@@ -293,7 +311,7 @@ func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName strin
 	}
 
 	if categoryName == string(domain.CategoryBusiness) {
-		return b.appendSplitBusinessPatterns(p, summary, categoryPatterns, allCategories, language)
+		return b.appendSplitBusinessPatterns(p, categoryPatterns, allCategories)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerGeneratorGeneratingPatternFile"),
@@ -325,18 +343,14 @@ func (b *planBuilder) appendCategoryPattern(p *skillgen.Plan, categoryName strin
 	return nil
 }
 
-func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary categorySummary, categoryPatterns []domain.Pattern, allCategories []string, language string) error {
-	groups := businessPatternGroups(b.skillsLoader.GetLocale(), categoryPatterns)
-	detailGroups, inlineGroups := splitBusinessPatternGroups(groups)
-	p.AddDir(filepath.Join("references", "patterns", string(domain.CategoryBusiness)))
-
+func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, categoryPatterns []domain.Pattern, allCategories []string) error {
+	items := businessPatternItems(categoryPatterns)
+	groups, singles := groupBusinessResponsibilities(items)
 	indexData := businessIndexTemplateData{
-		Category:          summary.Category,
-		Summary:           summary.Summary,
 		PatternCount:      len(categoryPatterns),
 		LastUpdated:       knowledgeUpdatedAt(nil, categoryPatterns),
-		DetailGroups:      detailGroups,
-		InlineGroups:      inlineGroups,
+		Groups:            groups,
+		Singles:           singles,
 		RelatedReferences: businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "./"),
 	}
 
@@ -346,25 +360,24 @@ func (b *planBuilder) appendSplitBusinessPatterns(p *skillgen.Plan, summary cate
 		"project/references/patterns/business-index",
 		indexData,
 	)
+	for _, group := range groups {
+		p.AddFile(filepath.Join("references", "patterns", "business", "groups", filepath.Base(group.ReferencePath)),
+			skillgen.RelativeTemplate, "project/references/patterns/business-group", group)
+	}
 
-	for _, group := range detailGroups {
+	for _, pattern := range items {
 		data := businessDetailTemplateData{
-			Category:          summary.Category,
-			GroupTitle:        group.Title,
-			GroupSummary:      group.Summary,
-			PatternObjects:    group.Patterns,
-			PatternCount:      len(group.Patterns),
-			LastUpdated:       renderedKnowledgeUpdatedAt(group.Patterns),
-			CodeFenceLanguage: codeFenceLanguage(language),
-			RelatedReferences: businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "../"),
+			Category:          string(domain.CategoryBusiness),
+			GroupTitle:        pattern.Name,
+			PatternObjects:    []patternRenderModel{pattern},
+			LastUpdated:       renderedKnowledgeUpdatedAt([]patternRenderModel{pattern}),
+			RelatedReferences: businessPatternReferenceLinks(allCategories, b.skillsLoader.GetLocale(), "../../"),
 		}
-		outputPath := filepath.Join("references", "patterns", string(domain.CategoryBusiness), group.ID+".md")
-		p.AddFile(outputPath, skillgen.RelativeTemplate, "project/references/patterns/business-detail", data)
+		p.AddFile(businessPatternItemPath(pattern), skillgen.RelativeTemplate, "project/references/patterns/business-detail", data)
 	}
 
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticOperationComplete"),
 		"operation", "generator.append_split_business_patterns",
-		"groups_count", len(groups),
 		"patterns_count", len(categoryPatterns),
 	)
 	return nil
@@ -381,6 +394,7 @@ func codeFenceLanguage(language string) string {
 
 // PlanOptions 封装生成计划所需的项目级参数。
 type PlanOptions struct {
+	Navigation          *codegraph.Index // 仅用于结构导航，不解释业务含义。
 	SkillName           string
 	ProjectName         string
 	Language            string

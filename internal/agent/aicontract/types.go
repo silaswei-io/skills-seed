@@ -1,5 +1,15 @@
 package aicontract
 
+// SemanticScreenOutput 只列出结构证据足以明确排除的候选。
+type SemanticScreenOutput struct {
+	Skip []SemanticScreenDecisionOutput `json:"skip"`
+}
+
+type SemanticScreenDecisionOutput struct {
+	Path   string `json:"path" jsonschema_description:"exact candidate path"`
+	Reason string `json:"reason" jsonschema_description:"concrete structural reason for exclusion"`
+}
+
 // CodeLocationOutput 是 AI 输出中的最小可维护代码位置契约。
 type CodeLocationOutput struct {
 	CurrentLocation string `json:"current_location" jsonschema:"required,example=src/component/file.ext:140" jsonschema_description:"repository-relative source file and 1-based line in the format src/component/file.ext:140"`
@@ -15,13 +25,13 @@ type EvidenceLocationOutput struct {
 	Confidence  float64 `json:"confidence,omitempty" jsonschema:"minimum=0,maximum=1" jsonschema_description:"0.0-1.0"`
 }
 
-// DiffAnchorOutput 描述增量学习候选由哪段变更触发。
+// DiffAnchorOutput 描述增量学习候选所依据的当前源码路径。
 type DiffAnchorOutput struct {
 	Path        string `json:"path" jsonschema_description:"repository-relative changed file path from this evidence focus"`
 	Line        int    `json:"line,omitempty" jsonschema:"minimum=1" jsonschema_description:"1-based line in the changed file when available"`
 	Symbol      string `json:"symbol,omitempty" jsonschema_description:"changed function, method, type, config key, state, or route term when available"`
-	ChangeKind  string `json:"change_kind" jsonschema:"enum=added,enum=modified,enum=deleted" jsonschema_description:"added|modified|deleted"`
-	Description string `json:"description" jsonschema_description:"why this changed hunk triggers the candidate pattern"`
+	ChangeKind  string `json:"change_kind" jsonschema:"enum=present,enum=deleted" jsonschema_description:"present for current source, deleted for removed source"`
+	Description string `json:"description" jsonschema_description:"current source fact or verified absence supporting the decision"`
 }
 
 // BusinessMethodOutput 描述可路由、可复用的能力入口。
@@ -112,7 +122,8 @@ type ProfileRefreshRecommendationOutput struct {
 }
 
 type AnalyzeCurrentCodebaseBatchOutput struct {
-	Focuses []AnalyzeCurrentEvidenceFocusOutput `json:"focuses" jsonschema_description:"one result object for every evidenced input learning focus"`
+	Assessment string                              `json:"assessment,omitempty" jsonschema:"enum=resolved,enum=unresolved" jsonschema_description:"required for automatic semantic supplementation: resolved only if supplied evidence supports a decision; unresolved when evidence is insufficient"`
+	Focuses    []AnalyzeCurrentEvidenceFocusOutput `json:"focuses" jsonschema_description:"one result object for every evidenced input learning focus"`
 }
 
 type AnalyzeCurrentEvidenceFocusOutput struct {
@@ -123,24 +134,20 @@ type AnalyzeCurrentEvidenceFocusOutput struct {
 }
 
 type KnowledgeChangeOutput struct {
-	FocusAction   string             `json:"focus_action" jsonschema:"enum=existing,enum=extend,enum=new,enum=no_change" jsonschema_description:"how the diff relates to the listed learning focuses"`
+	FocusAction   string             `json:"focus_action" jsonschema:"enum=existing,enum=extend,enum=new,enum=no_change" jsonschema_description:"how current source relates to the listed learning focus"`
 	FocusID       string             `json:"focus_id" jsonschema_description:"exact input learning focus id this decision belongs to"`
 	FocusName     string             `json:"focus_name,omitempty" jsonschema_description:"matched or proposed learning focus name"`
-	PatternAction string             `json:"pattern_action" jsonschema:"enum=add,enum=update,enum=reinforce,enum=retire,enum=no_change" jsonschema_description:"how the diff changes pattern knowledge"`
+	PatternAction string             `json:"pattern_action" jsonschema:"enum=add,enum=update,enum=reinforce,enum=retire,enum=no_change" jsonschema_description:"how current source changes stored knowledge"`
 	PatternID     string             `json:"pattern_id,omitempty" jsonschema_description:"existing pattern id for update, reinforce, retire, or proposed id for add"`
 	Proposal      *PatternOutput     `json:"proposal,omitempty" jsonschema_description:"candidate pattern only for add, update, or reinforce; omit for no_change or retire without source-backed replacement"`
-	Anchors       []DiffAnchorOutput `json:"anchors" jsonschema_description:"changed hunks that triggered this knowledge change"`
-	Reason        string             `json:"reason" jsonschema_description:"why this action follows from the diff anchors and bounded context"`
+	Anchors       []DiffAnchorOutput `json:"anchors" jsonschema_description:"listed source paths supporting this knowledge change"`
+	Reason        string             `json:"reason" jsonschema_description:"why this action follows from current source evidence and related stored knowledge"`
 }
 
 type AnalyzeCurrentDeltaBatchOutput struct {
-	KnowledgeChanges          []KnowledgeChangeOutput             `json:"knowledge_changes" jsonschema_description:"diff-triggered knowledge changes; do not output ordinary inventory patterns"`
+	Assessment                string                              `json:"assessment,omitempty" jsonschema:"enum=resolved,enum=unresolved" jsonschema_description:"required for automatic semantic supplementation: resolved only if supplied evidence supports a decision; unresolved when evidence is insufficient"`
+	KnowledgeChanges          []KnowledgeChangeOutput             `json:"knowledge_changes" jsonschema_description:"source-backed knowledge changes; do not output ordinary inventory patterns"`
 	ProfileRefreshRecommended *ProfileRefreshRecommendationOutput `json:"profile_refresh_recommended" jsonschema_description:"true only when broad structure or technology changes require full refresh"`
-}
-
-type LearningPathSkipOutput struct {
-	Path   string `json:"path" jsonschema_description:"repository-relative path from the exact candidate file list; never output an absolute path, directory, glob, invented path, or path containing .."`
-	Reason string `json:"reason" jsonschema_description:"brief reason this file has low learning value for this run"`
 }
 
 type EvidenceFocusOutput struct {
@@ -153,12 +160,6 @@ type EvidenceFocusOutput struct {
 	EntryPaths    []string `json:"entry_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
 	RelatedPaths  []string `json:"related_paths,omitempty" jsonschema_description:"paths relative to project root from the allowed file list"`
 	ScopeReason   string   `json:"scope_reason,omitempty" jsonschema_description:"why these files belong together"`
-}
-
-type PlanLearningAgendaOutput struct {
-	Focuses      []EvidenceFocusOutput    `json:"focuses" jsonschema_description:"high-value learning focuses for this run; unassigned input paths receive a deterministic fallback focus"`
-	SkippedPaths []LearningPathSkipOutput `json:"skipped_paths,omitempty" jsonschema_description:"optional explicit skip receipts for concrete input files whose evidence value was directly checked; must not overlap focus paths"`
-	Reason       string                   `json:"reason" jsonschema_description:"one short sentence summarizing the planning boundary"`
 }
 
 type KnowledgeRevisionOutput struct {

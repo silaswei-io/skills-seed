@@ -73,9 +73,6 @@ func learnedResponsibilityTotal(profile *domain.ProjectProfile) int {
 	for _, module := range profile.KeyModules {
 		add(stringx.FirstNonBlank(module.Name, module.Path))
 	}
-	for _, method := range profile.BusinessMethods {
-		add(method.Name)
-	}
 	for _, layer := range profile.Layers {
 		add(layer.Name)
 	}

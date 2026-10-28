@@ -1,0 +1,6 @@
+# {{.Title}}
+
+以下是同一责任主题下的已审查条目。每条规则仍有自己的适用条件和源码证据；只读取与任务相关的详情。
+
+{{range .Items}}- [{{.Name}}]({{.ReferencePath}}){{with .EvidenceLocations}}：`{{(index . 0).DisplayLocation}}`{{end}}
+{{end}}

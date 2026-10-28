@@ -9,12 +9,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/knowledge/maintained"
 )
 
-// DiffFileRef 指向 runtime 目录中的文件 diff。
-type DiffFileRef struct {
-	Path     string // 原文件路径
-	DiffPath string // runtime 中的 diff 文件路径
-}
-
 // UserDefinePatternRequest 用户自定义模式请求
 type UserDefinePatternRequest struct {
 	Description string // 用户自然语言描述
@@ -138,7 +132,6 @@ type AnalyzeCurrentCodebaseRequest struct {
 	StructuralContextPath string
 	MainFiles             []string
 	SampleFiles           []SampleFile
-	DiffFiles             []DiffFileRef
 	KnownPatternsJSON     string
 	KnownPatternsPath     string
 	KnownPatternsCount    int
@@ -162,7 +155,6 @@ type AnalyzeCurrentEvidenceFocus struct {
 	EvidenceFocus domain.EvidenceFocus
 	FocusPaths    []string
 	SampleFiles   []SampleFile
-	DiffFiles     []DiffFileRef
 }
 
 // AnalyzeCurrentCodebaseBatchRequest 请求在一次 Agent 调用中分析多个证据焦点。
@@ -214,20 +206,21 @@ type AnalyzeCurrentEvidenceResult struct {
 
 // AnalyzeCurrentCodebaseBatchResult 是批量当前代码学习的结果。
 type AnalyzeCurrentCodebaseBatchResult struct {
+	// Assessment 区分证据已充分判断与仍有缺口；旧深度学习结果可省略。
+	Assessment   string
 	Focuses      []AnalyzeCurrentEvidenceResult
 	Conversation Conversation
 }
 
-// AnalyzeCurrentDeltaFocus 描述增量学习中的单个 diff 锚定证据焦点输入。
+// AnalyzeCurrentDeltaFocus 描述增量学习中的当前源码证据和已有知识。
 type AnalyzeCurrentDeltaFocus struct {
 	EvidenceFocus   domain.EvidenceFocus
 	FocusPaths      []string
 	ContextFiles    []SampleFile
-	DiffFiles       []DiffFileRef
 	RelatedPatterns []domain.Pattern
 }
 
-// AnalyzeCurrentDeltaBatchRequest 请求基于 diff anchor 判断知识变化。
+// AnalyzeCurrentDeltaBatchRequest 请求基于当前源码证据判断知识变化。
 type AnalyzeCurrentDeltaBatchRequest struct {
 	ProjectName           string
 	RootPath              string
@@ -265,8 +258,10 @@ func (r *AnalyzeCurrentDeltaBatchRequest) FocusIDs() []string {
 	return ids
 }
 
-// AnalyzeCurrentDeltaBatchResult 是 diff 锚定增量学习的结构化结果。
+// AnalyzeCurrentDeltaBatchResult 是增量学习的结构化结果。
 type AnalyzeCurrentDeltaBatchResult struct {
+	// Assessment 区分证据已充分判断与仍有缺口；旧深度学习结果可省略。
+	Assessment                string
 	Changes                   []domain.KnowledgeChange
 	ProfileRefreshRecommended ProfileRefreshRecommendation
 }
@@ -277,7 +272,7 @@ type FocusAnalysisMode string
 const (
 	// FocusAnalysisModeFull 使用完整源码样本与结构上下文分析。
 	FocusAnalysisModeFull FocusAnalysisMode = "full"
-	// FocusAnalysisModeDelta 使用 diff 锚定与相关既有知识分析。
+	// FocusAnalysisModeDelta 使用当前源码与相关既有知识分析。
 	FocusAnalysisModeDelta FocusAnalysisMode = "delta"
 )
 
@@ -286,7 +281,6 @@ type AnalyzeCurrentFocusInput struct {
 	EvidenceFocus   domain.EvidenceFocus
 	FocusPaths      []string
 	SampleFiles     []SampleFile
-	DiffFiles       []DiffFileRef
 	RelatedPatterns []domain.Pattern // 仅 delta 模式使用
 }
 
@@ -338,50 +332,6 @@ type AnalyzeCurrentFocusBatchResult struct {
 	Changes                   []domain.KnowledgeChange
 	Conversation              Conversation
 	ProfileRefreshRecommended ProfileRefreshRecommendation
-}
-
-// LearningPathSkip 记录规划阶段明确跳过的输入路径及原因。
-type LearningPathSkip struct {
-	Path   string
-	Reason string
-}
-
-// PlanningSourceFact 是规划 Agent 用于确认文件密度和声明边界的轻量事实。
-type PlanningSourceFact struct {
-	Path          string               `json:"path"`
-	SizeBytes     int64                `json:"size_bytes"`
-	LineCount     int                  `json:"line_count"`
-	NonBlankLines int                  `json:"non_blank_lines"`
-	SymbolCount   int                  `json:"symbol_count"`
-	Symbols       []PlanningSymbolFact `json:"symbols,omitempty"`
-}
-
-// PlanningSymbolFact 是源码事实清单中的声明摘要。
-type PlanningSymbolFact struct {
-	Name string `json:"name"`
-	Kind string `json:"kind"`
-	Line int    `json:"line"`
-}
-
-// PlanLearningAgendaRequest 请求按源码证据边界拆分当前待学习文件。
-type PlanLearningAgendaRequest struct {
-	ProjectName           string
-	RootPath              string
-	Language              string
-	FocusPaths            []string
-	SourceFacts           []PlanningSourceFact
-	StructuralContext     string // 结构化分析上下文
-	StructuralContextPath string // 结构化分析上下文文件路径
-	UserContext           string
-	MaintainedGuidance    maintained.Snapshot
-	LearningMode          config.LearningMode
-}
-
-// PlanLearningAgendaResult 是 AI 生成的业务证据焦点计划。
-type PlanLearningAgendaResult struct {
-	Focuses      []domain.EvidenceFocus
-	SkippedPaths []LearningPathSkip
-	Reason       string
 }
 
 // NormalizePatternsRequest 请求把当前学习得到的候选模式合并为稳定的入库决策。
@@ -530,7 +480,6 @@ type ProjectAnalyzer interface {
 	RefreshProjectProfile(ctx context.Context, req *AnalyzeProjectRequest) (*AnalyzeProjectResult, error)
 	ExtractAuthority(ctx context.Context, req *ExtractAuthorityRequest) (*ExtractAuthorityResult, error)
 	ReviewAuthority(ctx context.Context, req *ReviewAuthorityRequest) (*ExtractAuthorityResult, error)
-	PlanLearningAgenda(ctx context.Context, req *PlanLearningAgendaRequest) (*PlanLearningAgendaResult, error)
 	// AnalyzeCurrentFocusBatch 是焦点分析的统一入口；Mode 选择 full 或 delta 材料与契约。
 	AnalyzeCurrentFocusBatch(ctx context.Context, req *AnalyzeCurrentFocusBatchRequest) (*AnalyzeCurrentFocusBatchResult, error)
 	AnalyzeCurrentCodebaseBatch(ctx context.Context, req *AnalyzeCurrentCodebaseBatchRequest) (*AnalyzeCurrentCodebaseBatchResult, error)

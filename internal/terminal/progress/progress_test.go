@@ -162,7 +162,7 @@ func TestRenderClipsLongProgressLineToTerminalWidth(t *testing.T) {
 		tracker.renderLocked(false)
 	})
 
-	line := strings.TrimPrefix(output, "\r\x1b[2K")
+	line := strings.TrimSuffix(strings.TrimPrefix(output, "\r"), "\x1b[K")
 	require.LessOrEqual(t, runewidth.StringWidth(line), 41)
 	require.Contains(t, line, "…")
 }
@@ -381,7 +381,7 @@ func TestMultiTrackerRenderClipsLongLinesBeforeTheyWrap(t *testing.T) {
 	for _, movement := range []string{"\x1b[3F", "\x1b[4F", "\x1b[5F", "\x1b[6F"} {
 		require.NotContains(t, output, movement)
 	}
-	require.Contains(t, output, "\x1b[J")
+	require.NotContains(t, output, "\x1b[J", "same-height refresh must not clear the panel")
 	require.Contains(t, output, "…")
 	require.NotContains(t, output, "request_id")
 }
@@ -433,6 +433,40 @@ func TestMultiTrackerFailMarksTaskAndFlushesPendingLines(t *testing.T) {
 	}
 }
 
+func TestProgressRenderSkipsUnchangedFramesAndDetails(t *testing.T) {
+	output := captureStdout(t, func() {
+		renderProgressLines([]string{"| analyzing", "stable detail"}, false)
+		renderProgressLines([]string{"| analyzing", "stable detail"}, false)
+		renderProgressLines([]string{"/ analyzing", "stable detail"}, false)
+	})
+	require.Equal(t, 1, strings.Count(output, "| analyzing"))
+	require.Equal(t, 1, strings.Count(output, "stable detail"))
+	require.Contains(t, output, "\x1b[1F\r/ analyzing\x1b[K")
+	require.NotContains(t, output, "\x1b[J")
+	require.NotContains(t, output, "\x1b[2K")
+}
+
+func TestProgressRenderClearsRemovedDetailsAfterWritingReplacement(t *testing.T) {
+	output := captureStdout(t, func() {
+		renderProgressLines([]string{"long label", "detail one", "detail two"}, false)
+		renderProgressLines([]string{"short"}, false)
+	})
+	require.True(t, strings.HasSuffix(output, "\x1b[2F\rshort\x1b[K\x1b[J"))
+}
+
+func TestProgressRenderInvalidatesPreviousFrameAfterConsoleMessage(t *testing.T) {
+	output := captureStdout(t, func() {
+		renderProgressLines([]string{"analyzing"}, false)
+		PrintConsoleLineNow("retrying")
+		renderProgressLines([]string{"analyzing"}, false)
+		renderProgressLines([]string{"analyzing"}, true)
+		// 完成后的同名步骤必须重新显示，不能命中上一轮缓存。
+		renderProgressLines([]string{"analyzing"}, false)
+	})
+	require.Equal(t, 3, strings.Count(output, "analyzing"))
+	require.Contains(t, output, "retrying\n\ranalyzing")
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	resetConsoleState()
@@ -469,6 +503,7 @@ func resetConsoleState() {
 	progressActive = false
 	progressLineOpen = false
 	progressPhysicalLines = 0
+	progressLines = nil
 	pendingConsoleLines = nil
 }
 

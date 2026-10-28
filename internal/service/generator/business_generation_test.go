@@ -2,16 +2,80 @@ package generator
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/templates/skills"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"testing"
 )
+
+func TestGenerateSkillsSplitsUnfocusedBusinessRulesIntoIndividualReferences(t *testing.T) {
+	for _, locale := range []string{"zh-CN", "en-US"} {
+		t.Run(locale, func(t *testing.T) {
+			patterns := make([]domain.Pattern, 0, 32)
+			for i := 0; i < 32; i++ {
+				pattern := domain.NewPattern(fmt.Sprintf("rule-%02d", i), fmt.Sprintf("Rule %02d", i), domain.CategoryBusiness)
+				pattern.SetDescription(fmt.Sprintf("Unique business boundary %02d: %s", i, strings.Repeat("source-backed detail ", 20)))
+				pattern.SetRule(fmt.Sprintf("Reuse the verified entry for rule %02d", i))
+				pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: fmt.Sprintf("internal/domain/rule_%02d.go", i), Line: 10}}
+				patterns = append(patterns, *pattern)
+			}
+			svc := newGeneratorService(&mocks.MockPatternRepository{
+				GetAllFn: func(context.Context) ([]domain.Pattern, error) { return patterns, nil },
+			}, &mocks.MockProjectProfileRepository{}, skills.NewLoader(locale), &mocks.MockConfigReader{
+				ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
+			})
+			output := t.TempDir()
+			require.NoError(t, svc.GenerateSkills(context.Background(), output))
+
+			index := readGeneratedFile(t, output, "references", "patterns", "business.md")
+			require.NoFileExists(t, filepath.Join(output, "references", "patterns", "business", "other.md"))
+			for _, pattern := range patterns {
+				detail := readGeneratedFile(t, output, "references", "patterns", "business", "items", referenceFileID(pattern.ID)+".md")
+				require.Contains(t, detail, strings.TrimSpace(pattern.Description))
+				require.NotContains(t, index, strings.TrimSpace(pattern.Description))
+			}
+			require.Contains(t, index, "./business/items/")
+			assertNoBrokenMarkdownLinks(t, output)
+		})
+	}
+}
+
+func TestGenerateSkillsUsesResponsibilityThemeIndexWithoutMergingRules(t *testing.T) {
+	patterns := []domain.Pattern{
+		*domain.NewPattern("template-create", "证书模板创建校验", domain.CategoryBusiness),
+		*domain.NewPattern("template-update", "证书模板更新保护", domain.CategoryBusiness),
+		*domain.NewPattern("admin-login", "管理员登录契约", domain.CategoryBusiness),
+	}
+	for i := range patterns {
+		patterns[i].SetDescription(patterns[i].Name + " 的独立条件")
+	}
+	svc := newTestService(&mocks.MockPatternRepository{GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+		return patterns, nil
+	}})
+	output := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), output))
+	index := readGeneratedFile(t, output, "references", "patterns", "business.md")
+	require.Contains(t, index, "证书模板")
+	require.Contains(t, index, "管理员登录契约")
+	require.NotContains(t, index, "证书模板创建校验")
+	group := readGeneratedFile(t, output, "references", "patterns", "business", "groups", referenceFileID("证书模板")[:16]+".md")
+	require.Contains(t, group, "证书模板创建校验")
+	require.Contains(t, group, "证书模板更新保护")
+	require.NotContains(t, group, "独立条件")
+	for _, pattern := range patterns {
+		page := readGeneratedFile(t, output, "references", "patterns", "business", "items", referenceFileID(pattern.ID)+".md")
+		require.Contains(t, page, pattern.Name+" 的独立条件")
+	}
+	assertNoBrokenMarkdownLinks(t, output)
+}
 
 func TestGenerateSkillsRendersBusinessPatternMapFromEvidenceLocations(t *testing.T) {
 	pattern := domain.NewPattern("order-state-transition", "Order State Transition", domain.CategoryBusiness)
@@ -45,29 +109,21 @@ func TestGenerateSkillsRendersBusinessPatternMapFromEvidenceLocations(t *testing
 	require.Contains(t, index, "业务模式地图")
 	require.Contains(t, index, "Order")
 	require.Contains(t, index, "`internal/service/order/transition.go:42`")
-	require.Contains(t, index, "新需求定位方式")
-	require.Contains(t, index, "已学习业务规则")
-	require.Contains(t, index, "适用边界")
-	require.Contains(t, index, "订单状态流转必须经过订单服务的状态校验")
-	require.Contains(t, index, "ApplyOrderTransition")
+	require.Contains(t, index, "直接入口")
+	detail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "items", referenceFileID(pattern.ID)+".md")
+	require.Contains(t, detail, "适用边界")
+	require.Contains(t, detail, "订单状态流转必须经过订单服务的状态校验")
+	require.Contains(t, detail, "ApplyOrderTransition")
+	require.NotContains(t, index, "订单状态流转必须经过订单服务的状态校验")
 	require.NotContains(t, index, "订单状态流转入口")
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "order.md"))
 }
 
-func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
+func TestGenerateSkillsRoutesReviewedBusinessRuleDirectly(t *testing.T) {
 	pattern := domain.NewPattern("certificate-status-transition", "Certificate Status Transition", domain.CategoryBusiness)
 	pattern.Confidence = 0.9
 	pattern.SetDescription("Applies the verified certificate status transition.")
 	pattern.SetRule("Reuse the verified transition boundary before adding a certificate state change.")
-	pattern.DevelopmentFocus = &domain.DevelopmentFocus{
-		ID:          "certificate-lifecycle",
-		Name:        "Certificate Lifecycle",
-		RouteTerms:  []string{"certificate", "issue", "revoke", "status"},
-		EntryPaths:  []string{"internal/certificate/lifecycle.go"},
-		ScopeReason: "Certificate state transitions and issuance boundaries are reviewed together.",
-		Attributes:  []string{"stateful", "cross_module"},
-		RiskSignals: []string{"external effect"},
-	}
 	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{
 		Path:   "internal/certificate/lifecycle.go",
 		Line:   42,
@@ -82,20 +138,40 @@ func TestGenerateSkillsRoutesDevelopmentFocusToBusinessDetail(t *testing.T) {
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	require.Contains(t, skill, "开发焦点")
-	require.Contains(t, skill, "Certificate Lifecycle")
-	require.Contains(t, skill, "./references/patterns/business/certificate-lifecycle.md")
-	require.Contains(t, skill, "按改动路径选择一个主焦点")
-	require.Contains(t, skill, "通用动词或技术词不能单独命中焦点")
+	require.NotContains(t, skill, "开发焦点")
+	require.Contains(t, skill, "./references/patterns/business.md")
 	require.Contains(t, skill, "不得从现有代码推断可直接编辑")
-	require.Contains(t, skill, "焦点边界速记")
-	require.Contains(t, skill, "stateful")
 	require.NotContains(t, skill, "internal/certificate/lifecycle.go:42")
 
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	require.Contains(t, index, "Certificate Lifecycle")
-	require.Contains(t, index, "`certificate` `issue` `revoke` `status`")
-	require.FileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "certificate-lifecycle.md"))
+	require.Contains(t, index, "Certificate Status Transition")
+	require.Contains(t, index, "./business/items/"+referenceFileID(pattern.ID)+".md")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "certificate-lifecycle.md"))
+}
+
+func TestGenerateSkillsIndexesReviewedReusableCapability(t *testing.T) {
+	pattern := domain.NewPattern("sm9-encryption", "SM9 encryption capability", domain.CategoryUtils)
+	pattern.SetDescription("Use the existing SM9 encryption entry for compatible ciphertext.")
+	pattern.BusinessMethod = &domain.BusinessMethod{
+		Name: "EncryptSM9", CodeLocation: domain.CodeLocation{CurrentLocation: "internal/crypto/sm9.go:20"},
+		Description: "Encrypts data with the project's SM9 implementation.",
+		Usage:       "SM9 加密、SM9 ciphertext、EncryptSM9",
+		Type:        "common", Function: "func EncryptSM9(publicKey []byte, plaintext []byte) ([]byte, error)",
+		Prerequisites: "SM9 public key", Returns: "ciphertext or an error",
+	}
+	pattern.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "internal/crypto/sm9.go", Line: 20, Symbol: "EncryptSM9", Kind: "function"}}
+	svc := newTestService(&mocks.MockPatternRepository{GetAllFn: func(context.Context) ([]domain.Pattern, error) {
+		return []domain.Pattern{*pattern}, nil
+	}})
+	output := t.TempDir()
+	require.NoError(t, svc.GenerateSkills(context.Background(), output))
+
+	index := readGeneratedFile(t, output, "references", "business-methods.md")
+	require.Contains(t, index, "SM9 加密")
+	require.Contains(t, index, "EncryptSM9")
+	require.Contains(t, index, "internal/crypto/sm9.go:20")
+	require.Contains(t, readGeneratedFile(t, output, "SKILL.md"), "./references/business-methods.md")
+	assertNoBrokenMarkdownLinks(t, output)
 }
 
 func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) {
@@ -122,8 +198,9 @@ func TestGenerateSkillsMarksHighRiskBusinessPatternsAsCheckpoints(t *testing.T) 
 
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	require.Contains(t, index, "Resource Destroy Command")
-	require.Contains(t, index, "风险检查点")
-	require.Contains(t, index, "不要把危险动作当作普通复用建议")
+	detail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "items", referenceFileID(pattern.ID)+".md")
+	require.Contains(t, detail, "风险检查点")
+	require.Contains(t, detail, "不要把危险动作当作普通复用建议")
 }
 
 func TestGenerateSkillsDoesNotProjectLegacyProfileUtilities(t *testing.T) {
@@ -259,9 +336,18 @@ func TestGenerateSkills_GroupsBusinessMethodsBySourceModule(t *testing.T) {
 
 	methods := readGeneratedFile(t, tmpDir, "references", "business-methods.md")
 	assert.Contains(t, methods, "## Cmd")
-	assert.Contains(t, methods, "### Run")
+	assert.Contains(t, methods, "[Run](./business-methods/")
 	assert.Contains(t, methods, "## Vpn")
-	assert.Contains(t, methods, "- **归属模块**: `vpn`")
+	detailFiles, err := filepath.Glob(filepath.Join(tmpDir, "references", "business-methods", "*.md"))
+	require.NoError(t, err)
+	require.Len(t, detailFiles, 2)
+	var details string
+	for _, path := range detailFiles {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		details += string(content)
+	}
+	assert.Contains(t, details, "- **归属模块**: `vpn`")
 	assert.NotContains(t, methods, "原始方法名")
 }
 
@@ -299,9 +385,6 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 	patterns[0].ScopePath = "internal/application/billing"
 	patterns[1].ScopePath = "internal/application/billing"
 	patterns[2].ScopePath = "internal/application/notification"
-	billingFocus := &domain.DevelopmentFocus{ID: "billing", Name: "Billing", RouteTerms: []string{"billing"}}
-	patterns[0].DevelopmentFocus = billingFocus.Clone()
-	patterns[1].DevelopmentFocus = billingFocus.Clone()
 
 	mockPattern := &mocks.MockPatternRepository{
 		GetAllFn: func(ctx context.Context) ([]domain.Pattern, error) {
@@ -341,20 +424,17 @@ func TestGenerateSkills_RendersBusinessIndexAndDomainDetails(t *testing.T) {
 
 	index := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, index, "业务模式地图")
-	assert.Contains(t, index, "./business/billing.md")
-	assert.NotContains(t, index, "./business/notification.md")
+	for _, pattern := range patterns {
+		assert.Contains(t, index, "./business/items/"+referenceFileID(pattern.ID)+".md")
+	}
 	assert.Contains(t, index, "Delivery Rule")
 	assert.NotContains(t, index, "func (s *Service)")
 	assert.NotContains(t, index, "#### ✅ 代码证据")
 
-	billingDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "billing.md")
-	assert.Contains(t, billingDetail, "Activation Rule")
-	assert.Contains(t, billingDetail, "Renewal Rule")
-	assert.Contains(t, billingDetail, "已验证入口")
-	assert.Contains(t, billingDetail, "internal/application/billing/service.go:10")
-	assert.NotContains(t, billingDetail, "#### 代码证据")
-	assert.NotContains(t, billingDetail, "func ActivatePlan")
-
+	activationDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "items", referenceFileID(patterns[0].ID)+".md")
+	assert.Contains(t, activationDetail, "已验证入口")
+	assert.Contains(t, activationDetail, "internal/application/billing/service.go:10")
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "billing.md"))
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "notification.md"))
 
 	assertNoBrokenMarkdownLinks(t, tmpDir)

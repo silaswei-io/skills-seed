@@ -69,6 +69,14 @@ func TestInitializeProjectStoresConfiguredParallelism(t *testing.T) {
 	require.Equal(t, config.LearningModeNormal, configRepo.GetCurrentLearningConfig().Mode)
 }
 
+func TestInitializeProjectDoesNotCreateRuntimeWithoutArtifacts(t *testing.T) {
+	projectRoot := t.TempDir()
+	initGitDir(t, projectRoot)
+
+	require.NoError(t, initializeSkillWithOptions(projectRoot, "zh-CN", domain.ModeProject, initializeSkillOptions{initLogger: true}))
+	require.NoDirExists(t, filepath.Join(projectRoot, ".skills-seed", "runtime"))
+}
+
 func TestInitializeProjectStoresConfiguredAgentModel(t *testing.T) {
 	projectRoot := t.TempDir()
 	initGitDir(t, projectRoot)

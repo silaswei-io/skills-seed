@@ -49,20 +49,6 @@ var skillTemplateCatalog = []TemplateEntry{
 		Providers:    []string{"common"},
 	},
 	{
-		ID:           "project-reference-common-utils",
-		RelativeName: "project/references/common-utils",
-		Ext:          metadata.SkillsTemplateExt,
-		OutputPath:   "references/common-utils.md",
-		Providers:    []string{"common"},
-	},
-	{
-		ID:           "project-pattern-business",
-		RelativeName: "project/references/patterns/business",
-		Ext:          metadata.SkillsTemplateExt,
-		OutputPath:   "references/patterns/business.md",
-		Providers:    []string{"common"},
-	},
-	{
 		ID:           "project-pattern-default",
 		RelativeName: "project/references/patterns/default",
 		Ext:          metadata.SkillsTemplateExt,

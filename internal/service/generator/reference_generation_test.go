@@ -2,6 +2,11 @@ package generator
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/boltdb"
@@ -10,10 +15,6 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 )
 
 func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) {
@@ -54,7 +55,7 @@ func TestGenerateSkillsDoesNotSkipWhenReferenceOutputIsIncomplete(t *testing.T) 
 	require.FileExists(t, missingPath)
 }
 
-func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
+func TestGenerateSkillsDoesNotRequireAIProjectProfile(t *testing.T) {
 	pattern := domain.NewPattern("p1", "Error Wrapping", domain.CategoryError)
 	pattern.Confidence = 0.9
 	mockPattern := &mocks.MockPatternRepository{
@@ -75,8 +76,7 @@ func TestGenerateSkills_RequiresProjectProfile(t *testing.T) {
 	svc := newGeneratorService(mockPattern, mockProfile, loader, cfg)
 
 	err := svc.GenerateSkills(context.Background(), t.TempDir())
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "项目画像")
+	assert.NoError(t, err)
 }
 
 func TestGenerateSkills_RendersProjectOverviewFromProfile(t *testing.T) {
@@ -178,7 +178,7 @@ func TestGenerateSkills_RendersRelatedReferencesForCategoryBoundaries(t *testing
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
 	skill := readGeneratedFile(t, tmpDir, "SKILL.md")
-	assert.Contains(t, skill, "进入任何分类模式后，先检查其中的“相关参考”")
+	assert.Contains(t, skill, "进入模式页后，先检查其中的“相关参考”")
 
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.Contains(t, businessIndex, "## 相关参考")
@@ -313,8 +313,14 @@ func TestGenerateSkills_SplitsProfileReferences(t *testing.T) {
 	businessMethods, err := os.ReadFile(filepath.Join(tmpDir, "references", "business-methods.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(businessMethods), "IssueCertificate")
-	assert.Contains(t, string(businessMethods), "- **位置状态**: `valid`")
-	assert.Contains(t, string(businessMethods), "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error")
+	methodDetails, err := filepath.Glob(filepath.Join(tmpDir, "references", "business-methods", "*.md"))
+	require.NoError(t, err)
+	require.Len(t, methodDetails, 1)
+	methodDetail, err := os.ReadFile(methodDetails[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(methodDetail), "- **位置状态**: `valid`")
+	assert.Contains(t, string(methodDetail), "func (s *Service) IssueCertificate(ctx context.Context, req *IssueRequest) error")
+	assert.NotContains(t, string(businessMethods), "func (s *Service) IssueCertificate")
 	assert.Contains(t, string(businessMethods), "./patterns/business.md")
 
 	modules, err := os.ReadFile(filepath.Join(tmpDir, "references", "modules.md"))
@@ -539,13 +545,15 @@ func TestGenerateSkills_RendersEvidenceScopedGuidance(t *testing.T) {
 
 	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
 	assert.NotContains(t, businessIndex, "## 规则断言")
-	assert.Contains(t, businessIndex, "## 子域路由")
-	assert.Contains(t, businessIndex, "适用边界")
-	assert.Contains(t, businessIndex, "Only one plan can be active")
+	assert.Contains(t, businessIndex, "## 直接入口")
+	businessDetail := readGeneratedFile(t, tmpDir, "references", "patterns", "business", "items", referenceFileID(businessPattern.ID)+".md")
+	assert.Contains(t, businessDetail, "适用边界")
+	assert.Contains(t, businessDetail, "Only one plan can be active")
+	assert.NotContains(t, businessIndex, "Only one plan can be active")
 	assert.NotContains(t, businessIndex, "复用建议（需按源码复核）")
 	assert.NotContains(t, businessIndex, "适用与实现观察（需按源码复核）")
 	assert.NotContains(t, businessIndex, "Deactivate existing active plans before creating or activating a plan")
-	assert.Contains(t, businessIndex, "ActivatePlan")
+	assert.Contains(t, businessDetail, "ActivatePlan")
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business", "vocab.md"))
 }
 
@@ -638,9 +646,7 @@ func TestGenerateSkills_FiltersMissingEvidencePaths(t *testing.T) {
 
 	require.NoError(t, svc.GenerateSkills(context.Background(), tmpDir))
 
-	businessIndex := readGeneratedFile(t, tmpDir, "references", "patterns", "business.md")
-	require.Contains(t, businessIndex, existingPath+":3")
-	require.NotContains(t, businessIndex, missingPath)
+	require.NoFileExists(t, filepath.Join(tmpDir, "references", "patterns", "business.md"), "incomplete semantic evidence must not be projected")
 
 	require.NoFileExists(t, filepath.Join(tmpDir, "references", "business-methods.md"))
 

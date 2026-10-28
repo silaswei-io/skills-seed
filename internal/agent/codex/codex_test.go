@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/agent/aicontract"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	promptloader "github.com/silaswei-io/skills-seed/internal/prompts"
@@ -196,7 +197,7 @@ while [ "$#" -gt 0 ]; do
 	shift
 done
 printf '%s\n' '{"type":"thread.started","thread_id":"thread-test"}'
-printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"knowledge_changes\":[{\"focus_action\":\"no_change\",\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"pattern_action\":\"no_change\",\"pattern_id\":\"\",\"proposal\":null,\"anchors\":[],\"reason\":\"No reusable change.\"}],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}"}}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"assessment\":null,\"knowledge_changes\":[{\"focus_action\":\"no_change\",\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"pattern_action\":\"no_change\",\"pattern_id\":\"\",\"proposal\":null,\"anchors\":[],\"reason\":\"No reusable change.\"}],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}"}}'
 `
 	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
 	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
@@ -236,7 +237,7 @@ while [ "$#" -gt 0 ]; do
 	shift
 done
 printf '%s\n' '{"type":"thread.started","thread_id":"thread-test"}'
-printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"focuses\":[{\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"patterns\":[],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}]}"}}'
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"assessment\":null,\"focuses\":[{\"focus_id\":\"api-contract-design\",\"focus_name\":\"API contract design\",\"patterns\":[],\"profile_refresh_recommended\":{\"needed\":false,\"reason\":\"\"}}]}"}}'
 `
 	require.NoError(t, os.WriteFile(commandPath, []byte(command), 0o755))
 	t.Setenv("CAPTURE_SCHEMA_PATH", schemaPath)
@@ -272,4 +273,39 @@ func requireArgValue(t *testing.T, args []string, name string) string {
 	}
 	t.Fatalf("argument %s not found in %v", name, args)
 	return ""
+}
+
+func TestPromptOnlyCodexDisablesRepositoryExploration(t *testing.T) {
+	dir := t.TempDir()
+	configDir := t.TempDir()
+	t.Setenv("CODEX_HOME", configDir)
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(`[plugins.local]
+enabled=true
+[mcp_servers.codegraph]
+command="codegraph"
+`), 0600))
+	capture := filepath.Join(dir, "args")
+	cwdFile := filepath.Join(dir, "cwd")
+	t.Setenv("CAPTURE_ARGS", capture)
+	t.Setenv("CAPTURE_CWD", cwdFile)
+	command := filepath.Join(dir, "fake-codex")
+	require.NoError(t, os.WriteFile(command, []byte(`#!/bin/sh
+pwd > "$CAPTURE_CWD"
+printf '%s\n' "$@" > "$CAPTURE_ARGS"
+printf '%s\n' '{"type":"item.completed","item":{"id":"result","type":"agent_message","text":"{\"content\":\"ok\",\"summary\":null,\"route_terms\":[]}"}}'
+`), 0755))
+	ag := New(command, 10*time.Second, promptloader.New("codex", "en-US", ""), true, config.RetryConfig{}, config.AgentRuntimeOptions{})
+	ctx := runtimecontext.WithSeedPath(context.Background(), filepath.Join(dir, ".skills-seed"))
+	output, err := ag.callCodex(ctx, "OptimizeRule", "complete evidence", aicontract.ContractOptimizeRule, agent.NewPromptOnlyRuntimeTask("test"))
+	require.NoError(t, err)
+	require.Contains(t, output, "ok")
+	args, err := os.ReadFile(capture)
+	require.NoError(t, err)
+	for _, flag := range []string{"features.shell_tool=false", "features.unified_exec=false", `mcp_servers."codegraph".enabled=false`, `plugins."local".enabled=false`, "--ephemeral"} {
+		require.Contains(t, string(args), flag)
+	}
+	cwd, err := os.ReadFile(cwdFile)
+	require.NoError(t, err)
+	require.NotContains(t, string(cwd), dir)
+	require.Contains(t, string(cwd), "skills-seed-prompt-only-")
 }

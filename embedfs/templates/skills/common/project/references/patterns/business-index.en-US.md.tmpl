@@ -3,66 +3,20 @@
 **Pattern Count**: {{.PatternCount}}
 **Last Updated**: {{.LastUpdated}}
 
-This page is a business-pattern router, not a full rule list. After matching a domain, read its detail page and confirm behavior against the current source evidence.
+Match the task's business action, state, rule, or changed path to an entry. Read only its relevant detail page, then confirm the boundary against current source.
 
-{{if .RelatedReferences}}
-## Related References
+{{if .RelatedReferences}}## Related References
 
-This page routes product/domain rules and behavior flows. Cross-boundary work such as interface/message fields, state/persistence boundaries, or failure semantics also requires the matching reference below.
-
-{{range .RelatedReferences}}
-- [{{.Title}}]({{.Path}}): {{.Reason}}
+{{range .RelatedReferences}}- [{{.Title}}]({{.Path}}): {{.Reason}}
 {{end}}
 {{end}}
+{{if .Groups}}## Responsibility Themes
 
-## Route A New Request
-
-Match the request's business nouns, user actions, state changes, rules or policies, entry channels, external dependencies, exception symptoms, or changed file paths to the domains or learned business rules below. Do not match only by package names or technical abbreviations. Read the most relevant detail page or inline rule first, then confirm behavior against current code.
-
-## Domain Routing
-
-{{if .DetailGroups}}
-{{range .DetailGroups}}
-- **[{{.Title}}]({{.Path}})** - {{.Summary.Description}} ({{len .Patterns}} patterns)
-  - When to read: {{if .Summary.IsFallback}}Read when the task cannot be mapped to a specific domain but changes business rules, state transitions, runtime behavior, or cross-module flows.{{else}}Read when the task mentions {{if .Summary.Keywords}}{{range .Summary.Keywords}}`{{.}}` {{end}}{{else}}`{{.Title}}`{{end}}, uses synonymous business actions or state changes, or changes code under {{if .Summary.PrimaryPath}}`{{.Summary.PrimaryPath}}`{{else}}`{{.ID}}`{{end}}.{{end}}
-  {{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`{{end}}
-  {{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}{{end}}
-  {{if .Patterns}}- Pattern entries: {{range $i, $pattern := .Patterns}}{{if $i}}, {{end}}`{{$pattern.Name}}`{{end}}{{end}}
+{{range .Groups}}- [{{.Title}}]({{.ReferencePath}}) ({{len .Items}})
 {{end}}
-{{else}}
-No business domain currently needs a separate detail file; read the learned business rules below directly.
 {{end}}
+{{if .Singles}}## Direct Entries
 
-{{if .InlineGroups}}
-## Learned Business Rules
-
-The rules below are source-backed but not large enough to justify separate pages. When a task matches these terms or paths, inspect the verified source entries before changing behavior.
-
-{{range .InlineGroups}}
-### {{.Title}}
-
-{{.Summary.Description}}
-
-{{if .Summary.PrimaryPath}}- Primary evidence path: `{{.Summary.PrimaryPath}}`
-{{end}}{{if .Summary.Keywords}}- Keywords: {{range .Summary.Keywords}}`{{.}}` {{end}}
-{{end}}
-{{range .Patterns}}
-#### {{.Name}}
-
-{{if .HighRiskOperational}}**Risk Checkpoint**: This pattern involves irreversible, privileged, state/resource-changing, or externally visible behavior. Use it to locate verified safeguards; do not treat the dangerous action as ordinary reuse guidance.
-
-{{end}}
-{{if .Description}}{{if .AllowsHardConstraint}}**Description**: {{.Description}}{{else}}**Applicability**: {{.Description}}{{end}}
-
-{{end}}{{if .Rule}}**User rule**: {{.Rule}}
-
-{{end}}{{if .EvidenceLocations}}**Verified Source**
-
-{{range .EvidenceLocations}}- `{{.DisplayLocation}}`{{if .Symbol}} - {{.Symbol}}{{end}}
-{{end}}
-{{end}}{{if .BusinessMethod}}**Verified Entry Point**: `{{.BusinessMethod.DisplayLocation}}` - {{.BusinessMethod.Name}}
-{{end}}
-
-{{end}}
+{{range .Singles}}- [{{.Name}}]({{.ReferencePath}}){{with .EvidenceLocations}}: `{{(index . 0).DisplayLocation}}`{{end}}
 {{end}}
 {{end}}

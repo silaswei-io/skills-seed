@@ -228,21 +228,22 @@ func NormalizePatternStatus(status PatternStatus) PatternStatus {
 
 // PatternEvidenceLocation 保存一条模式的源码证据位置。
 type PatternEvidenceLocation struct {
-	Path        string  `json:"path,omitempty"`        // 相对项目根路径
-	Line        int     `json:"line,omitempty"`        // 1-based 行号
-	Symbol      string  `json:"symbol,omitempty"`      // 相关函数、方法、类型或变量名
-	Kind        string  `json:"kind,omitempty"`        // 证据类型，如 function/method/file
-	Description string  `json:"description,omitempty"` // 证据说明
-	Confidence  float64 `json:"confidence,omitempty"`  // 证据位置置信度，0.0-1.0
+	ContentHash string  `json:"content_hash,omitempty"` // 程序记录的已审查源码 SHA-256，不由 AI 声明。
+	Path        string  `json:"path,omitempty"`         // 相对项目根路径
+	Line        int     `json:"line,omitempty"`         // 1-based 行号
+	Symbol      string  `json:"symbol,omitempty"`       // 相关函数、方法、类型或变量名
+	Kind        string  `json:"kind,omitempty"`         // 证据类型，如 function/method/file
+	Description string  `json:"description,omitempty"`  // 证据说明
+	Confidence  float64 `json:"confidence,omitempty"`   // 证据位置置信度，0.0-1.0
 }
 
-// PatternDiffAnchor 描述 learn current 增量候选由哪段变更触发。
+// PatternDiffAnchor 描述 learn current 增量候选所依据的当前源码路径。
 // 该字段仅用于本次分析验收，不属于长期模式库事实。
 type PatternDiffAnchor struct {
 	Path        string `json:"path,omitempty"`        // 相对项目根路径
 	Line        int    `json:"line,omitempty"`        // 变更后文件中的 1-based 行号；删除文件可为空
 	Symbol      string `json:"symbol,omitempty"`      // 变更触达的函数、方法、类型或配置键
-	ChangeKind  string `json:"change_kind,omitempty"` // added、modified、deleted
+	ChangeKind  string `json:"change_kind,omitempty"` // present、deleted
 	Description string `json:"description,omitempty"` // 该变更为何触发此候选模式
 }
 
@@ -276,8 +277,6 @@ type Pattern struct {
 	Generated      bool            // 是否已生成到 skills
 	BusinessMethod *BusinessMethod // 能力入口信息（可选，用于可复用入口定位）
 	KnowledgeFlags []string        `json:"knowledge_flags,omitempty"` // 经证据审查的受控知识标志
-	// DevelopmentFocus 复用学习阶段已审查的证据焦点，用于生成稳定的开发导航入口。
-	DevelopmentFocus *DevelopmentFocus `json:"development_focus,omitempty"`
 	// EvidenceLocations 是模式对应的通用源码证据位置，不等同于 BusinessMethod 的可调用位置。
 	EvidenceLocations []PatternEvidenceLocation `json:"evidence_locations,omitempty"`
 	ProjectID         string                    `json:"project_id,omitempty"`     // workspace 模式下的子项目 ID
@@ -323,7 +322,6 @@ func (p *Pattern) SetBusinessMethod(method *BusinessMethod) {
 func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
-	p.DevelopmentFocus = p.DevelopmentFocus.Clone()
 	// DiffAnchors 仅服务增量学习验收，禁止进入长期模式库。
 	p.DiffAnchors = nil
 	if previous != nil && !previous.CreatedAt.IsZero() {
@@ -352,7 +350,6 @@ func (p *Pattern) NormalizeForSave(previous *Pattern, now time.Time) {
 func (p *Pattern) NormalizeAfterLoad() {
 	p.KnowledgeFlags = CanonicalKnowledgeFlags(p.KnowledgeFlags)
 	p.Status = NormalizePatternStatus(p.Status)
-	p.DevelopmentFocus = p.DevelopmentFocus.Clone()
 	if p.LastSeenAt.IsZero() {
 		p.LastSeenAt = p.UpdatedAt
 		if p.LastSeenAt.IsZero() {
@@ -369,8 +366,14 @@ func (p Pattern) IsActive() bool {
 	return NormalizePatternStatus(p.Status) == PatternStatusActive
 }
 
+// IsSemanticKnowledge 判断源码学习结果是否值得投影为业务判断或可复用能力。
+// 非业务分类必须有经审查的能力入口，避免通用实现细节进入 Skill。
+func (p Pattern) IsSemanticKnowledge() bool {
+	return p.Category == CategoryBusiness || p.BusinessMethod != nil && IsRouteableBusinessMethod(*p.BusinessMethod)
+}
+
 // CanBeRetiredFromCurrentLearning 判断模式是否允许由当前代码增量学习自动删除。
-// 用户定义和默认模式属于显式约束，不能由模型根据局部 diff 自动撤销。
+// 用户定义和默认模式属于显式约束，不能由模型根据局部源码自动撤销。
 func (p Pattern) CanBeRetiredFromCurrentLearning() bool {
 	switch p.Source {
 	case SourceLearned, SourceLearnedCurrent, SourceInit:

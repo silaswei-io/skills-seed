@@ -114,7 +114,19 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	if err != nil {
 		return "", agent.Conversation{}, agent.AgentOutputArchive{}, 0, false, err
 	}
-	args := codexExecArgsForConversation(c.allowUserPlugins, outputSchemaPath, c.runtime, conversation)
+	// 自包含任务不加载项目目录，也不继承分析会话或仓库读取工具。
+	if task.PromptOnly {
+		workDir, err = os.MkdirTemp("", "skills-seed-prompt-only-")
+		if err != nil {
+			return "", agent.Conversation{}, agent.AgentOutputArchive{}, 0, false, err
+		}
+		defer os.RemoveAll(workDir)
+		conversation = agent.Conversation{}
+	}
+	args := codexExecArgsForConversation(c.allowUserPlugins && !task.PromptOnly, outputSchemaPath, c.runtime, conversation)
+	if task.PromptOnly {
+		args = append(codexPromptOnlyArgs(), args...)
+	}
 	logger.Diagnostic(i18n.Get("LoggerDiagnosticAgentCallStart"),
 		"agent", c.Name(),
 		"operation", operation,
@@ -142,7 +154,7 @@ func (c *CodexAgent) doCallCodex(ctx context.Context, operation, prompt, outputS
 	startedAt := time.Now()
 	if err := cmd.Run(); err != nil {
 		duration := time.Since(startedAt)
-		err = agent.NormalizeInvocationError(err, ctx.Err(), c.timeout)
+		err = agent.NormalizeInvocationError(err, ctx.Err(), duration.Round(time.Second))
 		stdoutStr := stdout.String()
 		stderrStr := stderr.String()
 		retryable := agent.IsRetryableInvocationError(err) || isCodexRetryableError(stdoutStr, stderrStr)
@@ -322,7 +334,7 @@ func codexRuntimeArgs(runtime config.AgentRuntimeOptions) []string {
 }
 
 func codexDisableUserPluginArgs() []string {
-	pluginNames := codexUserPluginNames()
+	pluginNames := codexUserComponentNames("plugins")
 	args := make([]string, 0, len(pluginNames)*2)
 	for _, name := range pluginNames {
 		args = append(args, "-c", fmt.Sprintf("plugins.%s.enabled=false", strconv.Quote(name)))
@@ -330,16 +342,23 @@ func codexDisableUserPluginArgs() []string {
 	return args
 }
 
-func codexUserPluginNames() []string {
+// codexPromptOnlyArgs 保留认证与模型提供方配置，只关闭自动补充不需要的工具入口。
+func codexPromptOnlyArgs() []string {
+	args := []string{"-c", "features.shell_tool=false", "-c", "features.unified_exec=false", "-c", "features.apps=false", "-c", "features.multi_agent=false", "-c", "web_search=\"disabled\""}
+	for _, name := range codexUserComponentNames("mcp_servers") {
+		args = append(args, "-c", fmt.Sprintf("mcp_servers.%s.enabled=false", strconv.Quote(name)))
+	}
+	return args
+}
+
+func codexUserComponentNames(section string) []string {
 	configPath := filepath.Join(codexHomeDir(), "config.toml")
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil
 	}
 
-	var cfg struct {
-		Plugins map[string]interface{} `toml:"plugins"`
-	}
+	var cfg map[string]interface{}
 	if err := toml.Unmarshal(content, &cfg); err != nil {
 		logger.Debug(i18n.Get("AgentCodexReadUserPluginsFailed"),
 			"config_path", configPath,
@@ -348,8 +367,9 @@ func codexUserPluginNames() []string {
 		return nil
 	}
 
-	names := make([]string, 0, len(cfg.Plugins))
-	for name := range cfg.Plugins {
+	table, _ := cfg[section].(map[string]interface{})
+	names := make([]string, 0, len(table))
+	for name := range table {
 		names = append(names, name)
 	}
 	sort.Strings(names)

@@ -121,6 +121,16 @@ func TestRenderKeepsHighRiskBoundarySeparate(t *testing.T) {
 	require.Equal(t, "resource-destroy", view[1].ID)
 }
 
+func TestRenderKeepsDistinctCallableResponsibilitiesWithSharedEvidence(t *testing.T) {
+	left := newPattern("site-status", "站点状态变更", domain.CategoryBusiness)
+	left.BusinessMethod = &domain.BusinessMethod{Name: "EnableSite", CodeLocation: domain.CodeLocation{CurrentLocation: "site/enable.go:20"}}
+	left.EvidenceLocations = []domain.PatternEvidenceLocation{{Path: "site/cache.go", Symbol: "ClearCache"}}
+	right := newPattern("site-update", "站点配置更新", domain.CategoryBusiness)
+	right.BusinessMethod = &domain.BusinessMethod{Name: "UpdateSite", CodeLocation: domain.CodeLocation{CurrentLocation: "site/update.go:20"}}
+	right.EvidenceLocations = left.EvidenceLocations
+	require.Len(t, Render([]domain.Pattern{*left, *right}), 2)
+}
+
 func TestRenderCompactsPatternsWithSharedCoreEvidence(t *testing.T) {
 	first := newPattern("hotback-state-lock", "热备编辑状态锁机制", domain.CategoryConcurrency)
 	first.SetDescription("热备系统使用全局状态机协调编辑操作与定时任务，防止VIP漂移或编辑过程中定时任务干扰。")

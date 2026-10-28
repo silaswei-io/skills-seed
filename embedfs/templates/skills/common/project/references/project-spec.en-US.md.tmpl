@@ -9,8 +9,8 @@
 ## Usage
 
 - This spec is the authoritative-rule entry point and keeps only current constraints and synchronization coverage. Source-learned content is routed by responsibility to the project overview, business patterns, and capability entry index.
-- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}.
-- Category patterns describe behavioral patterns and reuse boundaries; {{if .References.BusinessMethods}}the [Capability Entry Index](./business-methods.md){{else}}the capability entry index{{end}} describes verified capabilities, signatures, prerequisites, return semantics, and usage scenarios.
+{{if .References.ProjectOverview}}- For the architecture map read [Project Overview](./project-overview.md){{if .References.KeyModules}}; for module details read [Key Modules](./modules.md){{end}}{{if .References.BusinessMethods}}; for capability entries read [Capability Entry Index](./business-methods.md){{end}}.{{end}}
+- Category patterns describe behavioral patterns and reuse boundaries; {{if .References.BusinessMethods}}the [Capability Entry Index](./business-methods.md){{else}}the capability entry index{{end}} locates verified capabilities, while individual details contain signatures, prerequisites, return semantics, and usage scenarios.
 - Authoritative rules only come from user-maintained or built-in constraints. Source-learned results are reuse and safety inspection entries only.
 - Explicit authoritative rules outrank current code and learned references. Current code may only correct a stale source-learned summary; it cannot override or relax authoritative constraints.
 
@@ -28,7 +28,7 @@
 {{end}}
 {{end}}
 {{if .EngineeringRules}}{{range .EngineeringRules}}- **{{.Title}}**: {{.Rule}} (source: `{{.Source}}`{{if .Evidence}}; evidence: {{range $i, $path := .Evidence}}{{if $i}}, {{end}}`{{$path}}`{{end}}{{end}})
-{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}*No user-maintained or built-in authoritative rules have been extracted. Source-learned patterns live in category pattern references.*
+{{end}}{{end}}{{if not .EngineeringRules}}{{if not .RuleReferences}}No additional authority summary is stored; follow the user instructions and applicable sources below.
 {{end}}{{end}}
 {{if .AuthorityCoverage}}## Authority Sync Coverage
 
@@ -37,3 +37,10 @@ This list makes the input boundary included in authority sync auditable. An incl
 {{range .AuthorityCoverage}}- `{{.Source}}`{{if .Sections}}: {{range $i, $section := .Sections}}{{if $i}}, {{end}}{{$section}}{{end}}{{else}} (file-level coverage){{end}}
 {{end}}
 {{end}}
+{{if .AuthorityPaths}}
+## Authoritative Sources
+
+Paths are relative to the project root. Read root instructions first, then instructions applicable to the changed directory. Directory rules do not automatically apply repository-wide. These are source locations, not a claim that their rules have been extracted.
+
+{{range .AuthorityPaths}}- `{{.}}`
+{{end}}{{end}}

@@ -21,7 +21,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	runContext := opts.RunContext
 	if runContext == nil {
 		var err error
-		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, AnalyzeCodebaseOptions{UseSnapshotDiffs: true})
+		runContext, err = s.BuildCodebaseRunContext(ctx, projectRoot, language, AnalyzeCodebaseOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +37,6 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 			EvidenceFocus:   focus.EvidenceFocus,
 			FocusPaths:      focusPaths,
 			ContextFiles:    filterSampleFilesByFocus(runContext.SampleFiles, evidencePaths),
-			DiffFiles:       filterDiffFilesByFocus(runContext.DiffFiles, evidencePaths),
 			RelatedPatterns: append([]domain.Pattern(nil), focus.RelatedPatterns...),
 		})
 		focusByID[focus.EvidenceFocus.ID] = relPathSet(focusPaths)
@@ -64,11 +63,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	}
 
 	structuralContext, err := s.collectStructuralContext(ctx, projectRoot, structuralContextRequest{
-		ProjectName: projectName,
-		Language:    language,
-		Purpose:     "diff anchored current codebase delta analysis",
-		FocusPaths:  focusPaths,
-		SeedPaths:   batchDeltaSeedPaths(focuses),
+		SeedPaths: batchDeltaSeedPaths(focuses),
 	})
 	if err != nil {
 		return nil, err
@@ -83,6 +78,9 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 			"error", err,
 		)
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
+	}
+	if agent.CurrentLearningSupplement(ctx) != nil && result != nil && result.Assessment != "resolved" {
+		return nil, agent.ErrSupplementUnresolved
 	}
 	if err := agent.RequireResult(result, "AnalyzeCurrentDeltaBatch"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
@@ -100,7 +98,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 	)
 	evidence := make(map[string]domain.LearningEvidence, len(focuses))
 	for _, focus := range focuses {
-		evidence[focus.EvidenceFocus.ID] = learningEvidence(focus.ContextFiles, focus.DiffFiles, structuralContext)
+		evidence[focus.EvidenceFocus.ID] = learningEvidence(focus.ContextFiles, structuralContext)
 	}
 	return &AnalyzeCurrentDeltaBatchResult{
 		Evidence:                  evidence,
@@ -344,9 +342,6 @@ func batchDeltaSeedPaths(focuses []agent.AnalyzeCurrentDeltaFocus) []string {
 			add(path)
 		}
 		for _, file := range focus.ContextFiles {
-			add(file.Path)
-		}
-		for _, file := range focus.DiffFiles {
 			add(file.Path)
 		}
 		for _, pattern := range focus.RelatedPatterns {

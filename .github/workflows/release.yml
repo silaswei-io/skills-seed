@@ -63,6 +63,7 @@ jobs:
             fi
 
             mkdir -p "dist/${name}"
+            python3 scripts/bundle-codegraph.py "$goos" "$goarch"
             CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build \
               -ldflags="-s -w" \
               -o "dist/${name}/${binary}" \

@@ -77,17 +77,12 @@ Evidence packs:
 {{range .SampleFiles}}  - {{.Path}}
 {{end}}
 {{- end}}
-{{- if .DiffFiles}}
-- diffs:
-{{range .DiffFiles}}  - {{.Path}} -> {{.DiffPath}}
-{{end}}
-{{- end}}
 {{end}}
 
 Pack boundary:
 - An evidence focus is only an internal grouping of source that must be inspected together. It is not a work procedure, a user-maintained Workflow, or development instructions. Extract knowledge from the code; do not turn the focus name into steps for the future Agent.
 - Do not rely on hidden context from planning, other packs, authority extraction, project-map refresh, or later normalization. Only the explicit shared planning context path is allowed as run baseline.
-- Treat the explicit pack fields, runtime files, structural context, and listed source/diff files as the complete input.
+- Treat the explicit pack fields, runtime files, structural context, and listed source files as the complete input.
 - Do not scan outside listed pack files and directly referenced context. If evidence is insufficient, return that pack with `patterns: []`.
 - Use only tools explicitly available in this invocation. Do not attempt unavailable or denied tools, and do not retry a denied tool call.
 - Stop exploration once the listed evidence is sufficient to decide. If the evidence boundary cannot establish a candidate, return `patterns: []` instead of expanding the search.

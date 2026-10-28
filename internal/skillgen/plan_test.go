@@ -16,12 +16,8 @@ func TestPlanCollectsOperations(t *testing.T) {
 
 	data := map[string]string{"name": "demo"}
 	plan.AddFile("SKILL.md", CatalogTemplate, "catalog", data)
-	plan.AddDir("references")
-	plan.RemovePath("obsolete.md")
 
 	require.Equal(t, []File{{Path: "SKILL.md", Kind: CatalogTemplate, Template: "catalog", Data: data}}, plan.Files)
-	require.Equal(t, []string{"references"}, plan.CreateDirs)
-	require.Equal(t, []string{"obsolete.md"}, plan.RemovePaths)
 }
 
 func TestRendererValidatesDependenciesPlanAndContext(t *testing.T) {
@@ -36,18 +32,21 @@ func TestRendererValidatesDependenciesPlanAndContext(t *testing.T) {
 	require.ErrorIs(t, renderer.Render(ctx, plan), context.Canceled)
 }
 
-func TestRendererCreatesAndRemovesPlanPaths(t *testing.T) {
+func TestRendererCreatesDirectoriesForFiles(t *testing.T) {
 	outputPath := filepath.Join(t.TempDir(), "skill")
 	require.NoError(t, os.MkdirAll(filepath.Join(outputPath, "obsolete"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(outputPath, "obsolete", "file"), []byte("old"), 0o644))
 	plan := NewPlan(outputPath)
-	plan.AddDir("references")
-	plan.RemovePath("obsolete")
+	plan.AddFile("references/code-navigation.md", RelativeTemplate, "project/references/code-navigation", struct {
+		Files, Unindexed   int
+		AuthorityPaths     []string
+		HasBusinessMethods bool
+	}{})
 	renderer := NewRenderer(skills.NewLoaderForAgent("codex", "en-US"))
 
 	require.NoError(t, renderer.Render(context.Background(), plan))
-	require.DirExists(t, filepath.Join(outputPath, "references"))
-	require.NoDirExists(t, filepath.Join(outputPath, "obsolete"))
+	require.FileExists(t, filepath.Join(outputPath, "references", "code-navigation.md"))
+	require.FileExists(t, filepath.Join(outputPath, "obsolete", "file"))
 }
 
 func TestRendererRejectsUnsupportedTemplateKind(t *testing.T) {

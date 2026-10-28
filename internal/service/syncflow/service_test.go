@@ -3,9 +3,12 @@ package syncflow
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/silaswei-io/skills-seed/internal/domain"
+	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +45,7 @@ func TestServiceRunPropagatesLearnFailure(t *testing.T) {
 }
 
 func TestServiceRunGeneratesWhenOutputIsMissing(t *testing.T) {
-	want := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true}}
+	want := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{NoFileChanges: true, PendingFiles: 7}}
 	wantRequest := LearnCurrentRequest{StateScope: "scope", UserContext: "context", Force: true}
 	recorder := &changeRecorderStub{}
 	generated := false
@@ -64,6 +67,27 @@ func TestServiceRunGeneratesWhenOutputIsMissing(t *testing.T) {
 	require.Equal(t, want, got)
 	require.True(t, generated)
 	require.Len(t, recorder.details, 2)
+}
+
+func TestPendingLearningNeverReportsFullCompletion(t *testing.T) {
+	for _, outputMissing := range []bool{false, true} {
+		t.Run(fmt.Sprint(outputMissing), func(t *testing.T) {
+			output, err := os.CreateTemp(t.TempDir(), "console")
+			require.NoError(t, err)
+			defer output.Close()
+			previous := os.Stdout
+			os.Stdout = output
+			defer func() { os.Stdout = previous }()
+			err = RunAfterLearn(domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
+				NoFileChanges: true, PendingFiles: 7,
+			}}, outputMissing, func() error { return nil }, nil)
+			require.NoError(t, err)
+			data, err := os.ReadFile(output.Name())
+			require.NoError(t, err)
+			require.Contains(t, string(data), i18n.GetWithParams("SyncPartial", map[string]interface{}{"Pending": 7}))
+			require.NotContains(t, string(data), i18n.Get("SyncComplete"))
+		})
+	}
 }
 
 func TestServiceRunSkipsGenerationWithoutChanges(t *testing.T) {

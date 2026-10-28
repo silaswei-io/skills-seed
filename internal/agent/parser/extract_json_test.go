@@ -128,20 +128,6 @@ func TestParseUserDefinePatternResultRejectsInvalidPatternValues(t *testing.T) {
 	}
 }
 
-func TestParsePlanLearningAgendaResultKeepsCoverageReceipt(t *testing.T) {
-	result, err := ParsePlanLearningAgendaResult(`{
-		"focuses":[{"id":"contract","name":"Contract","analysis_depth":"careful","entry_paths":["src/contract.ext"]}],
-		"skipped_paths":[{"path":"src/generated.ext","reason":"Generated projection without source-of-truth value."}],
-		"reason":"Keep source-owned decisions."
-	}`)
-
-	require.NoError(t, err)
-	require.Len(t, result.Focuses, 1)
-	require.Len(t, result.SkippedPaths, 1)
-	require.Equal(t, "src/generated.ext", result.SkippedPaths[0].Path)
-	require.Equal(t, "Keep source-owned decisions.", result.Reason)
-}
-
 func TestParseReviewKnowledgeResultKeepsRevision(t *testing.T) {
 	result, err := ParseReviewKnowledgeResult(`{"decisions":[{
 		"candidate_id":"bounded-behavior","verdict":"revise","reason_code":"overclaimed",

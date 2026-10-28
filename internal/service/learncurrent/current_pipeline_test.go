@@ -2,206 +2,161 @@ package learncurrent
 
 import (
 	"context"
-	"errors"
-	"sync"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/analyzer"
+	"github.com/silaswei-io/skills-seed/internal/service/fileanalysis"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
 	"github.com/silaswei-io/skills-seed/internal/test/mocks"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLearningResumesReviewWithoutRepeatingSourceAnalysis(t *testing.T) {
-	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
-	mock := cont.Agent.(*mocks.MockAgent)
-	cont.PatternNormSvc = patternnorm.NewServiceWithNormalizer(cont.PatternRepo, mock)
-	stateRepo := commandstate.NewRepository(cont.SeedPath, commandStateLearnCurrent)
-	sourceCalls, reviewCalls := 0, 0
-	mock.AnalyzeCurrentBatchFn = func(_ context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-		sourceCalls++
-		return pipelineSourceResult(req), nil
-	}
-	mock.ReviewKnowledgeFn = func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
-		reviewCalls++
-		state, err := stateRepo.Load(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if state.Analysis == nil || len(state.Analysis.FocusKnowledge) != 1 || state.Analysis.FocusKnowledge[0].Reviewed {
-			return nil, errors.New("source must be checkpointed before review")
-		}
-		if len(req.Evidence.SourcePaths) == 0 {
-			return nil, errors.New("review must receive saved source facts")
-		}
-		if reviewCalls == 1 {
-			return nil, errors.New("review unavailable")
-		}
-		return acceptKnowledgeCandidates(req.Candidates), nil
-	}
-	opts := learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip)
-	_, err := runLearnCurrent(context.Background(), cont, opts)
-	require.ErrorContains(t, err, "review unavailable")
-	saved, err := cont.PatternRepo.GetAll(context.Background())
-	require.NoError(t, err)
-	require.Empty(t, saved)
-	_, err = runLearnCurrent(context.Background(), cont, opts)
-	require.NoError(t, err)
-	require.Equal(t, 1, sourceCalls)
-	require.Equal(t, 2, reviewCalls)
-	require.FileExists(t, cont.SeedPath+"/cache/snapshots/main.go")
-}
-
-func TestLearningReusesSourceConversationForSameFocusReview(t *testing.T) {
+func TestAnalyzePlannedBatchesUsesConfiguredParallelismAndCheckpoints(t *testing.T) {
 	cont := newLearnCurrentTestContainer(t, domain.ModeProject, nil)
+	config := cont.ConfigRepo.Get()
+	config.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(config))
 	mock := cont.Agent.(*mocks.MockAgent)
+	cont.AnalyzerSvc = analyzer.NewAnalyzerService(mock, cont.ConfigRepo)
 	cont.PatternNormSvc = patternnorm.NewServiceWithNormalizer(cont.PatternRepo, mock)
-	want := agent.Conversation{Provider: "claude", ID: "focus-session"}
-	mock.AnalyzeCurrentBatchFn = func(_ context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-		result := pipelineSourceResult(req)
-		result.Conversation = want
-		return result, nil
+	root := config.Project.RootPath
+	paths := []string{"alpha.go", "beta.go"}
+	focuses := make([]domain.EvidenceFocus, 0, len(paths))
+	batches := make([]learnCurrentBatch, 0, len(paths))
+	for i, path := range paths {
+		require.NoError(t, os.WriteFile(filepath.Join(root, path), []byte("package sample\nfunc Decide() {}\n"), 0600))
+		focus := domain.EvidenceFocus{ID: path, Name: path, EntryPaths: []string{path}}
+		focuses = append(focuses, focus)
+		batches = append(batches, learnCurrentBatch{index: i, focuses: []indexedEvidenceFocus{{index: i, focus: focus}}})
 	}
-	mock.ReviewKnowledgeFn = func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
-		require.Equal(t, want, req.Conversation)
-		return acceptKnowledgeCandidates(req.Candidates), nil
-	}
-
-	_, err := runLearnCurrent(context.Background(), cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
-	require.NoError(t, err)
-}
-
-func TestLearningDrainsSuccessfulAnalysisAfterSiblingFailure(t *testing.T) {
-	cont := newLearnCurrentTestContainer(t, domain.ModeProject, []config.WorkspaceProjectConfig{})
-	cfg := cont.ConfigRepo.Get()
-	cfg.Agent.Parallelism = 2
-	require.NoError(t, cont.ConfigRepo.Update(cfg))
-	root := cont.ConfigRepo.GetProjectConfig().RootPath
-	writeLearnFile(t, root, "second.go", "package main\nfunc second() {}\n")
-	gitAddAll(t, root)
-	mock := cont.Agent.(*mocks.MockAgent)
-	mock.PlanLearningAgendaFn = func(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
-			{ID: "first", Name: "First", EntryPaths: []string{"main.go"}},
-			{ID: "second", Name: "Second", EntryPaths: []string{"second.go"}},
-		}}, nil
-	}
-	started := make(chan struct{})
-	failed := make(chan struct{})
+	run := newLearnCurrentProjectRun(context.Background(), cont, learnCurrentProjectOptions{})
+	run.projectRoot = root
+	run.projectName = config.Project.Name
+	run.currentLanguage = "go"
+	run.incrementalChanges = &fileanalysis.FileChanges{AddedOrModified: paths, Records: []domain.FileAnalysisRecord{{Path: paths[0]}, {Path: paths[1]}}}
+	run.codebaseRunContext = &analyzer.CodebaseRunContext{}
+	state := commandstate.NewState(commandStateLearnCurrent, run.projectName, "go", "", nil, nil, focuses)
+	run.analysisState = state
+	started := make(chan string, len(paths))
+	release := make(chan struct{})
+	reviewStarted := make(chan struct{})
 	mock.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-		if req.Focuses[0].EvidenceFocus.ID == "first" {
-			close(started)
+		focusID := req.Focuses[0].EvidenceFocus.ID
+		started <- focusID
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if focusID == paths[1] {
 			select {
-			case <-failed:
-				return pipelineSourceResult(req), nil
+			case <-reviewStarted:
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			}
 		}
-		<-started
-		close(failed)
-		return nil, errors.New("second source failed")
+		return pipelineSourceResult(req), nil
+	}
+	mock.ReviewKnowledgeFn = func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+		if req.EvidenceFocus.ID == paths[0] {
+			close(reviewStarted)
+		}
+		return acceptKnowledgeCandidates(req.Candidates), nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := runLearnCurrent(ctx, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
-	require.ErrorContains(t, err, "second source failed")
-	state, err := commandstate.NewRepository(cont.SeedPath, commandStateLearnCurrent).Load(context.Background())
+	run.ctx = agent.WithCallBudget(ctx, 2)
+	type outcome struct {
+		completed int
+		err       error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		completed, err := run.analyzePlannedBatches("analysis", state, batches, 2)
+		done <- outcome{completed: completed, err: err}
+	}()
+	var observed []string
+	for len(observed) < len(paths) {
+		select {
+		case id := <-started:
+			observed = append(observed, id)
+		case <-ctx.Done():
+			close(release)
+			t.Fatal("independent analysis batches did not start concurrently")
+		}
+	}
+	close(release)
+	result := <-done
+	require.NoError(t, result.err)
+	require.Equal(t, len(paths), result.completed)
+	require.ElementsMatch(t, paths, observed)
+	checkpoint, err := run.stateRepo.Load(context.Background())
 	require.NoError(t, err)
-	require.Len(t, state.Analysis.FocusKnowledge, 1)
-	require.Equal(t, "first", state.Analysis.FocusKnowledge[0].Focus.ID)
-	require.NotEmpty(t, state.Analysis.FocusKnowledge[0].Patterns)
+	require.Len(t, checkpoint.Analysis.FocusKnowledge, len(paths))
+	for _, unit := range checkpoint.Analysis.FocusKnowledge {
+		require.True(t, unit.Reviewed)
+	}
 }
 
-func TestReviewPipelineIsSerialEvenWithMultipleSlots(t *testing.T) {
+func TestReviewRemainingKnowledgeUsesConfiguredParallelismAndPreservesCheckpoint(t *testing.T) {
+	cont := newLearnCurrentTestContainer(t, domain.ModeProject, nil)
+	config := cont.ConfigRepo.Get()
+	config.Agent.Parallelism = 2
+	require.NoError(t, cont.ConfigRepo.Update(config))
 	focuses := []domain.EvidenceFocus{
-		{ID: "one", Name: "One", EntryPaths: []string{"one.go"}},
-		{ID: "two", Name: "Two", EntryPaths: []string{"two.go"}},
+		{ID: "first", Name: "First", EntryPaths: []string{"first.go"}},
+		{ID: "second", Name: "Second", EntryPaths: []string{"second.go"}},
 	}
-	units := make([]commandstate.FocusKnowledgeCheckpoint, len(focuses))
-	for i, focus := range focuses {
-		units[i] = commandstate.FocusKnowledgeCheckpoint{Focus: focus, Patterns: []domain.Pattern{
-			*admittedLearnCurrentPatternForTest(focus.ID, focus.Name, domain.CategoryBusiness, focus.EntryPaths[0]),
-		}}
+	units := make([]commandstate.FocusKnowledgeCheckpoint, 0, len(focuses))
+	for _, focus := range focuses {
+		units = append(units, commandstate.FocusKnowledgeCheckpoint{
+			Focus:    focus,
+			Patterns: []domain.Pattern{*admittedLearnCurrentPatternForTest(focus.ID+"-rule", focus.Name, domain.CategoryBusiness, focus.EntryPaths[0])},
+		})
 	}
-	var mu sync.Mutex
-	active, maximum := 0, 0
-	mock := &mocks.MockAgent{ReviewKnowledgeFn: func(_ context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
-		mu.Lock()
-		active++
-		maximum = max(maximum, active)
-		mu.Unlock()
-		defer func() { mu.Lock(); active--; mu.Unlock() }()
+	started := make(chan string, len(focuses))
+	release := make(chan struct{})
+	mock := &mocks.MockAgent{ReviewKnowledgeFn: func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
+		started <- req.EvidenceFocus.ID
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if req.EvidenceFocus.ID == "first" {
+			return nil, context.DeadlineExceeded
+		}
 		return acceptKnowledgeCandidates(req.Candidates), nil
 	}}
 	run := newKnowledgeReviewTestRun(t, focuses, units, mock, nil)
-	completed, err := run.analyzePlannedBatches("analysis", run.analysisState, nil, 4)
-	require.NoError(t, err)
-	require.Equal(t, 2, completed)
-	require.Equal(t, 1, maximum)
-}
-
-func TestLearningOverlapsReviewWithSourceAnalysisWithinLimit(t *testing.T) {
-	cont := newLearnCurrentTestContainer(t, domain.ModeProject, nil)
-	cfg := cont.ConfigRepo.Get()
-	cfg.Agent.Parallelism = 2
-	require.NoError(t, cont.ConfigRepo.Update(cfg))
-	root := cont.ConfigRepo.GetProjectConfig().RootPath
-	writeLearnFile(t, root, "second.go", "package main\nfunc second() {}\n")
-	gitAddAll(t, root)
-	mock := cont.Agent.(*mocks.MockAgent)
-	cont.PatternNormSvc = patternnorm.NewServiceWithNormalizer(cont.PatternRepo, mock)
-	mock.PlanLearningAgendaFn = func(context.Context, *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-		return &agent.PlanLearningAgendaResult{Focuses: []domain.EvidenceFocus{
-			{ID: "first", Name: "First", EntryPaths: []string{"main.go"}},
-			{ID: "second", Name: "Second", EntryPaths: []string{"second.go"}},
-		}}, nil
-	}
-	reviewStarted := make(chan struct{})
-	secondFinished := make(chan struct{})
-	var mu sync.Mutex
-	active, maximum := 0, 0
-	enter := func() func() {
-		mu.Lock()
-		active++
-		maximum = max(maximum, active)
-		mu.Unlock()
-		return func() { mu.Lock(); active--; mu.Unlock() }
-	}
-	mock.AnalyzeCurrentBatchFn = func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
-		defer enter()()
-		if req.Focuses[0].EvidenceFocus.ID == "second" {
-			select {
-			case <-reviewStarted:
-				close(secondFinished)
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		return pipelineSourceResult(req), nil
-	}
-	mock.ReviewKnowledgeFn = func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
-		defer enter()()
-		if req.EvidenceFocus.ID == "first" {
-			close(reviewStarted)
-			select {
-			case <-secondFinished:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		return acceptKnowledgeCandidates(req.Candidates), nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	run.cont.ConfigRepo = cont.ConfigRepo
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := runLearnCurrent(ctx, cont, learnCurrentOptionsForTest("", nil, learnCurrentProfileSkip))
+	run.ctx = agent.WithCallBudget(ctx, 2)
+	done := make(chan error, 1)
+	go func() {
+		done <- run.reviewRemainingKnowledge("analysis")
+	}()
+	for range focuses {
+		select {
+		case <-started:
+		case <-ctx.Done():
+			close(release)
+			t.Fatal("configured parallelism did not start two reviews")
+		}
+	}
+	close(release)
+	require.ErrorIs(t, <-done, context.DeadlineExceeded)
+	checkpoint, err := run.stateRepo.Load(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, 2, maximum)
+	require.False(t, checkpoint.Analysis.FocusKnowledge[0].Reviewed)
+	require.True(t, checkpoint.Analysis.FocusKnowledge[1].Reviewed)
 }
 
 func TestUnreviewedKnowledgeCannotBeProjectedOrStored(t *testing.T) {

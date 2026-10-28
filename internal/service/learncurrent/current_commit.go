@@ -11,6 +11,7 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/storage/commandstate"
 	"github.com/silaswei-io/skills-seed/internal/service/patternnorm"
+	"github.com/silaswei-io/skills-seed/internal/sourcecode"
 	"github.com/silaswei-io/skills-seed/internal/terminal/logger"
 )
 
@@ -18,6 +19,14 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 	startedAt := time.Now()
 	stepLabel := i18n.Get("ProgressLearnCurrentNormalizeAndSavePatterns")
 	if err := r.steps.Run(stepLabel, func() error {
+		if input := agent.CurrentLearningSupplement(r.ctx); input != nil {
+			for path, expected := range input.SourceHashes {
+				actual, err := sourcecode.EvidenceDigest(r.projectRoot, path)
+				if err != nil || actual != expected {
+					return agent.ErrSupplementUnresolved
+				}
+			}
+		}
 		if len(r.pendingKnowledgeReviews()) > 0 {
 			return fmt.Errorf("cannot store knowledge before all focuses are reviewed")
 		}
@@ -142,10 +151,6 @@ func (r *learnCurrentProjectRun) sourceBaselineCommitted() bool {
 	return r.analysisState != nil && r.analysisState.SourceBaselineCommitComplete()
 }
 
-func (r *learnCurrentProjectRun) projectionsCommitted() bool {
-	return r.analysisState != nil && r.analysisState.ProjectionsCommitComplete()
-}
-
 func (r *learnCurrentProjectRun) saveAnalysisCheckpoint() error {
 	if r.analysisState == nil {
 		return nil
@@ -258,4 +263,12 @@ func cloneFocusKnowledgeUnit(unit commandstate.FocusKnowledgeCheckpoint) command
 	unit.Patterns = append([]domain.Pattern(nil), unit.Patterns...)
 	unit.RetiredPatternIDs = append([]string(nil), unit.RetiredPatternIDs...)
 	return unit
+}
+
+func (r *learnCurrentProjectRun) markProjectionsCommitted() error {
+	if r.analysisState == nil {
+		return nil
+	}
+	r.analysisState.MarkProjectionsCommitted()
+	return r.stateRepo.Save(r.ctx, r.analysisState)
 }

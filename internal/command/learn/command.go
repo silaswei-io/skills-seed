@@ -27,10 +27,10 @@ func Cmd(cont *container.Container) *cobra.Command {
 	var (
 		language    string
 		focusPaths  []string
-		profileMode = "auto"
 		contextText string
 		contextPath []string
 		force       bool
+		semantic    bool
 	)
 	currentCmd := &cobra.Command{
 		Use:     "current",
@@ -43,9 +43,9 @@ func Cmd(cont *container.Container) *cobra.Command {
 				return fmt.Errorf("%s", i18n.Get("ErrNotInitialized"))
 			}
 			result, err := learncurrent.RunWithFlags(cmd.Context(), cont, learncurrent.Flags{
+				Semantic:    semantic,
 				Language:    language,
 				FocusPaths:  focusPaths,
-				ProfileMode: profileMode,
 				ContextText: contextText,
 				ContextPath: contextPath,
 				Force:       force,
@@ -60,9 +60,9 @@ func Cmd(cont *container.Container) *cobra.Command {
 	}
 	currentCmd.Flags().StringVarP(&language, "language", "l", "", i18n.Get("LearnFlagLanguage"))
 	currentCmd.Flags().StringArrayVarP(&focusPaths, "focus", "f", nil, i18n.Get("LearnFlagFocus"))
-	currentCmd.Flags().StringVar(&profileMode, "profile", "auto", i18n.Get("LearnFlagProfile"))
 	currentCmd.Flags().StringVar(&contextText, "context", "", i18n.Get("LearnFlagContext"))
 	currentCmd.Flags().StringArrayVar(&contextPath, "context-path", nil, i18n.Get("LearnFlagContextPath"))
+	currentCmd.Flags().BoolVar(&semantic, "semantic", false, i18n.Get("LearnFlagSemantic"))
 	currentCmd.Flags().BoolVar(&force, "force", false, i18n.Get("LearnFlagForce"))
 
 	learnCmd.AddCommand(currentCmd)

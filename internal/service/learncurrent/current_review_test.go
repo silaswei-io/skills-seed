@@ -51,13 +51,30 @@ func TestReviewLearnedKnowledgeUsesSerialFocusBoundaries(t *testing.T) {
 
 	require.Equal(t, []string{"auth", "key"}, focusCalls)
 	require.Equal(t, [][]string{{"auth-rule"}, {"key-create", "key-rotate"}}, candidateCalls)
-	require.Contains(t, strings.Join(progressLabels, "\n"), "焦点 1/2 认证 · 候选 1")
-	require.Contains(t, strings.Join(progressLabels, "\n"), "焦点 2/2 密钥 · 候选 2")
+	require.Contains(t, strings.Join(progressLabels, "\n"), "审查 认证 · 候选 1")
+	require.Contains(t, strings.Join(progressLabels, "\n"), "审查 密钥 · 候选 2")
 	state, err := run.stateRepo.Load(context.Background())
 	require.NoError(t, err)
 	require.Len(t, state.Analysis.FocusKnowledge, 2)
 	require.True(t, state.Analysis.FocusKnowledge[0].Reviewed)
 	require.True(t, state.Analysis.FocusKnowledge[1].Reviewed)
+}
+
+func TestSupplementReviewRejectsLineOutsideSuppliedSource(t *testing.T) {
+	focus := domain.EvidenceFocus{ID: "flow", EntryPaths: []string{"flow.go"}}
+	input := &agent.LearningSupplement{
+		SourceHashes: map[string]string{"flow.go": "source-hash"},
+		SourceRanges: map[string][]agent.SourceRange{"flow.go": {{Start: 5, End: 8}}},
+	}
+	run := &learnCurrentProjectRun{learnDeps: learnDeps{ctx: agent.WithLearningSupplement(context.Background(), input)}}
+	outside := *admittedLearnCurrentPatternForTest("outside", "Outside", domain.CategoryBusiness, "flow.go")
+	outside.EvidenceLocations[0].Line = 2
+	inside := *admittedLearnCurrentPatternForTest("inside", "Inside", domain.CategoryBusiness, "flow.go")
+	inside.EvidenceLocations[0].Line = 6
+	run.applyKnowledgeReviewResult(knowledgeReviewTask{unit: commandstate.FocusKnowledgeCheckpoint{Focus: focus}}, []domain.Pattern{outside, inside})
+	require.Len(t, run.patterns, 1)
+	require.Equal(t, "inside", run.patterns[0].ID)
+	require.Equal(t, "source-hash", run.patterns[0].EvidenceLocations[0].ContentHash)
 }
 
 func TestReviewLearnedKnowledgeResumesOnlyUnreviewedFocus(t *testing.T) {
@@ -143,7 +160,7 @@ func TestReviewAnalyzedFocusUsesCheckpointEvidence(t *testing.T) {
 	require.Equal(t, evidence, received)
 	require.Equal(t, "batch-001", receivedRuntimeLabel)
 	require.True(t, run.focusKnowledge[0].Reviewed)
-	require.Equal(t, domain.DevelopmentFocusFromEvidenceFocus(focus), run.patterns[0].DevelopmentFocus)
+	require.Len(t, run.patterns, 1)
 }
 
 func TestDerivedKnowledgeFollowsAgendaOrder(t *testing.T) {
@@ -193,6 +210,21 @@ func newKnowledgeReviewTestRun(t *testing.T, focuses []domain.EvidenceFocus, uni
 	}
 	run.syncDerivedKnowledge()
 	return run
+}
+
+func TestVerifiedSupplementMethodUsesCodeGraphSignature(t *testing.T) {
+	input := &agent.LearningSupplement{Symbols: map[string][]agent.SupplementSymbol{
+		"crypto/sm9.go": {{Name: "EncryptSM9", Line: 20, Signature: "func EncryptSM9(key, data []byte) ([]byte, error)"}},
+	}}
+	method := &domain.BusinessMethod{
+		Name: "EncryptSM9", CodeLocation: domain.CodeLocation{CurrentLocation: "crypto/sm9.go:20"},
+		Function: "invented signature",
+	}
+	verified := verifiedSupplementMethod(method, input)
+	require.NotNil(t, verified)
+	require.Equal(t, input.Symbols["crypto/sm9.go"][0].Signature, verified.Function)
+	require.Nil(t, verifiedSupplementMethod(&domain.BusinessMethod{Name: "DecryptSM9", CodeLocation: method.CodeLocation}, input))
+	require.Nil(t, verifiedSupplementMethod(&domain.BusinessMethod{Name: "EncryptSM9", CodeLocation: domain.CodeLocation{CurrentLocation: "crypto/sm9.go:21"}}, input))
 }
 
 func acceptKnowledgeCandidates(candidates []domain.Pattern) *agent.ReviewKnowledgeResult {

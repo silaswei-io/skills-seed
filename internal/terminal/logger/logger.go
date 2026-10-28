@@ -90,6 +90,8 @@ func InitWithRetention(logDir string, commandName string, level Level, maxLogFil
 		_ = file.Close()
 		file = nil
 	}
+	logger = nil
+	logPath = ""
 
 	// 确保日志目录存在
 	if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -148,8 +150,11 @@ func Close() error {
 		err := file.Close()
 		file = nil
 		logger = nil
+		logPath = ""
 		return err
 	}
+	logger = nil
+	logPath = ""
 	return nil
 }
 

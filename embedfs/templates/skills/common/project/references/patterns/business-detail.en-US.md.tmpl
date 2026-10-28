@@ -1,16 +1,9 @@
 # {{.GroupTitle}}
 
 **Category**: {{.Category}}
-**Pattern Count**: {{.PatternCount}}
 **Last Updated**: {{.LastUpdated}}
 
-{{.GroupSummary.Description}}
-
-This page reflects only learned reuse points with source evidence. For sparse domains, inspect the verified source entries below to confirm the full current boundary before changing behavior.
-
-## Request Matching
-
-{{if .GroupSummary.IsFallback}}Read this page when the task changes business rules, state transitions, runtime behavior, or cross-module flows but cannot be mapped to a stable domain from request terms or paths.{{else}}Read this page first when the request mentions {{if .GroupSummary.Keywords}}{{range .GroupSummary.Keywords}}`{{.}}` {{end}}{{else}}`{{.GroupTitle}}`{{end}}, uses synonymous business actions, state changes, rules or policies, entry channels, or external dependencies, or changes code under {{if .GroupSummary.PrimaryPath}}`{{.GroupSummary.PrimaryPath}}`{{else}}this domain's related code{{end}}.{{end}}
+This page records a reviewed business decision. Confirm its current implementation and applicability at the source entry point.
 
 {{if .RelatedReferences}}
 ## Related References

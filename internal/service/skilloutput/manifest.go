@@ -19,6 +19,7 @@ const manifestFileName = "manifest.json"
 
 // Manifest 描述一次 Skills 输出对应的已核验知识和生成文件。
 type Manifest struct {
+	NavigationHash        string         `json:"navigation_hash,omitempty"` // 对应已生成的本地导航版本；扫描本身不能更新此字段。
 	SchemaVersion         int            `json:"schema_version"`
 	KnowledgeSnapshotHash string         `json:"knowledge_snapshot_hash"`
 	ProgramVersion        string         `json:"program_version"`

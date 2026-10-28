@@ -55,28 +55,3 @@ func TestAnalyzeCurrentFocusBatchDispatchesFullMode(t *testing.T) {
 	require.Len(t, result.Focuses, 1)
 	require.Equal(t, "f1", result.Focuses[0].FocusID)
 }
-
-func TestPlanLearningAgendaUsesSharedContract(t *testing.T) {
-	var gotContract string
-	rt := fakeLearningRuntime{
-		name: "fake",
-		invoke: func(_ context.Context, in agent.StructuredInvoke) (agent.StructuredResult, error) {
-			gotContract = in.OutputContract
-			return agent.StructuredResult{Output: `{
-				"focuses":[{"id":"f1","name":"core","analysis_depth":"standard","entry_paths":["main.go"]}],
-				"skipped_paths":[],
-				"reason":"ok"
-			}`}, nil
-		},
-	}
-	result, err := PlanLearningAgenda(context.Background(), rt, &agent.PlanLearningAgendaRequest{
-		ProjectName: "demo",
-		RootPath:    "/tmp",
-		Language:    "go",
-		FocusPaths:  []string{"main.go"},
-	})
-	require.NoError(t, err)
-	require.Equal(t, aicontract.ContractPlanLearningAgenda, gotContract)
-	require.Len(t, result.Focuses, 1)
-	require.Equal(t, "f1", result.Focuses[0].ID)
-}

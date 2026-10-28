@@ -48,12 +48,19 @@ This is the complete command reference. Every command supports `--help`. Command
 
 | Command | Summary | Subcommands | Flags |
 |---|---|---|---|
-| `skills-seed` | Growing project skills for AI agents | `clear`, `cli-skills`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
+| `skills-seed` | Growing project skills for AI agents | `clear`, `cli-skills`, `codegraph`, `generate`, `hook`, `init`, `learn`, `log`, `patterns`, `preview`, `profile`, `reset [all\|patterns\|rules\|workflows]...`, `rule`, `sync`, `update`, `workflow`, `workspace` | `--help, -h` = `false`<br>`--version, -v` = `false` |
 | `skills-seed clear` | Clear rebuildable runtime data | `runtime` | `--help, -h` = `false` |
 | `skills-seed clear runtime` | Clear the runtime directory | - | `--dry-run` = `false`<br>`--force` = `false`<br>`--help, -h` = `false` |
 | `skills-seed cli-skills` | Manage global skills-seed CLI Skills | `install`, `uninstall` | `--help, -h` = `false` |
 | `skills-seed cli-skills install` | Install/update global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
 | `skills-seed cli-skills uninstall` | Uninstall global CLI Skills | - | `--help, -h` = `false`<br>`--target, -t` = `auto` |
+| `skills-seed codegraph` | Query local code structure and existing capabilities (no AI calls) | `callees <symbol-id>`, `callers <symbol-id>`, `impact <symbol-id>`, `node <symbol-id>`, `query <search-text>`, `trace <from-id> <to-id>` | `--help, -h` = `false` |
+| `skills-seed codegraph callees <symbol-id>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
+| `skills-seed codegraph callers <symbol-id>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
+| `skills-seed codegraph impact <symbol-id>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
+| `skills-seed codegraph node <symbol-id>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
+| `skills-seed codegraph query <search-text>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
+| `skills-seed codegraph trace <from-id> <to-id>` | Query local code structure and existing capabilities (no AI calls) | - | `--help, -h` = `false` |
 | `skills-seed generate` | Generate AI Agent outputs | `skills` | `--help, -h` = `false` |
 | `skills-seed generate skills` | Generate AI Agent skills | - | `--help, -h` = `false`<br>`--output, -o` = `` |
 | `skills-seed hook` | Manage Git hooks | `install`, `run`, `uninstall` | `--help, -h` = `false` |
@@ -62,7 +69,7 @@ This is the complete command reference. Every command supports `--help`. Command
 | `skills-seed hook uninstall` | Uninstall Git pre-commit hook | - | `--help, -h` = `false` |
 | `skills-seed init` | Initialize skills-seed project | - | `--agent-model` = ``<br>`--agent` = ``<br>`--help, -h` = `false`<br>`--locale, -l` = ``<br>`--mode` = `project`<br>`--no-interactive` = `false`<br>`--skills-locale` = ``<br>`--skills-name` = ``<br>`--skills` = ``<br>`--workspace` = `false` |
 | `skills-seed learn` | Learn from current code | `current` | `--help, -h` = `false` |
-| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--profile` = `auto` |
+| `skills-seed learn current` | Learn from current codebase | - | `--context-path` = `[]`<br>`--context` = ``<br>`--focus, -f` = `[]`<br>`--force` = `false`<br>`--help, -h` = `false`<br>`--language, -l` = ``<br>`--semantic` = `false` |
 | `skills-seed log` | Show learned change history | - | `--help, -h` = `false` |
 | `skills-seed patterns` | Manage learned patterns | `add (--content <description> \| --content-path <path>)`, `compact`, `delete <pattern-id>`, `show [pattern-id]`, `stats`, `update <pattern-id> (--content <description> \| --content-path <path>)` | `--help, -h` = `false` |
 | `skills-seed patterns add (--content <description> \| --content-path <path>)` | Add a user-defined pattern using natural language | - | `--category, -c` = ``<br>`--content-path` = `[]`<br>`--content` = ``<br>`--help, -h` = `false` |
@@ -276,7 +283,7 @@ Learn coding patterns, capability entries, and best practices from the current c
 
 | Command Form | Description | Common Example | Notes |
 |---|---|---|---|
-| `skills-seed learn current` | Incrementally learn from the current codebase | `skills-seed learn current --focus internal/service --profile skip` | Compares file md5 values and learns only added, modified, or deleted files; add `--force` after prompt or template upgrades to relearn the current scan scope |
+| `skills-seed learn current` | Incrementally learn from the current codebase | `skills-seed learn current --focus internal/service` | Compares file md5 values and learns only added, modified, or deleted files; add `--force` after prompt or template upgrades to relearn the current scan scope |
 
 #### `learn` Flags
 
@@ -290,25 +297,15 @@ Learn coding patterns, capability entries, and best practices from the current c
 |---|---:|---|
 | `--language`, `-l` | config or auto-detect | Primary project language |
 | `--focus`, `-f` | empty | Learn only a directory or file; may be repeated, and paths must stay under the project root |
-| `--profile` | `auto` | Authority-rule and project-map refresh strategy: `auto`, `skip`, or `refresh` |
 | `--context` | empty | One-time guidance for this learn run, passed to the AI agent and not written to `.skills-seed/context/` |
 | `--context-path` | empty | Read one-time guidance for this learn run from files or directories; may be repeated and is not written to `.skills-seed/context/` |
 | `--help`, `-h` | `false` | Show `learn current` help |
-
-#### `--profile` Values
-
-| Value | Description |
-|---|---|
-| `auto` | Refreshes when the project map is missing or authoritative input content changes; otherwise reuses the existing map |
-| `skip` | Learn source knowledge without refreshing authority rules or the project map |
-| `refresh` | Force authority extraction and project-map refresh from the current input |
 
 #### Common Examples
 
 ```bash
 skills-seed learn current
-skills-seed learn current --focus internal/service --profile skip
-skills-seed learn current --force --profile refresh
+skills-seed learn current --focus internal/service
 skills-seed learn current -f internal/agent -f internal/service
 skills-seed learn current --context "Focus on compatibility boundaries"
 skills-seed learn current --context-path .skills-seed/context.md
@@ -316,16 +313,16 @@ skills-seed learn current --context-path .skills-seed/context.md
 
 #### Notes
 
-1. After the first successful run, Skills Seed records md5 fingerprints for analyzed files. If no learnable files changed, source analysis, review, and admission are skipped. `auto` still compares authoritative input content and refreshes authority rules and the project map when those files changed.
+1. Local scanning covers every selected file. Changed files without an automatic supplement are recorded as `selection_skipped`; candidate files are marked semantically confirmed only after AI analysis, review, and admission. Unchanged inputs skip repeat analysis. Generic structure and implementation details are not retained as durable knowledge.
 2. Generated skill directories are excluded by default, including configured `skills.paths`, `.claude/skills/**`, and `.agents/skills/**`.
 3. The workspace root coordinates learning and does not store child patterns in root storage.
-4. In project mode, `agent.parallelism > 1` analyzes independent evidence-focus batches concurrently; results are still merged and checkpointed in agenda order.
-5. A workspace root config uses `agent.parallelism` for child-project concurrency; evidence-focus concurrency inside each child project is controlled by that child project's config.
-6. After child learning completes, the workspace root still analyzes the workspace profile, workspace rules, and saves relationship artifacts; terminal progress stays visible during these longer agent calls.
-7. The workspace root records an md5 for relationship-fact inputs. When `workspace.projects`, child project profiles, and this run's one-shot context are unchanged, and workspace profile/spec artifacts already exist, root profile/spec analysis is skipped. CLI version or prompt-template changes no longer retrigger relationship learning by themselves; an explicit `generate skills` run rebuilds generated outputs directly.
+4. Local analysis continues through normal candidates; workspace children share Agent concurrency, while each Agent call retains its own timeout and retry protection.
+5. Each semantic supplement can contain any number of related questions; it splits only when evidence exceeds the byte budget or the relationships are unrelated.
+6. Workspace relationship artifacts are derived from explicit project configuration and saved local knowledge, so they do not require a separate AI profile call.
+7. Generated Skills keep concise business knowledge and a CodeGraph navigation entry point; the complete symbol graph remains local.
 8. Persistent project context belongs in `.skills-seed/context/`; `--context` and `--context-path` affect only the current command.
-9. `learn current` uses file snapshots to detect added, modified, and deleted states. After analysis, snapshots are replaced within the current scope so the next run computes diffs from the new clean snapshot.
-10. When bounded inputs such as focus paths, diffs, samples, or entry files exist, source-evidence analysis and project-map refresh use structural context configured by `learning.current.structural`; the default `provider: auto` prefers CodeGraph and falls back to embedded tree-sitter when the CodeGraph command or index is unavailable. Explicit `provider: codegraph` requires CodeGraph. Without bounded inputs, it does not scan the whole repository.
+9. `learn current` detects added, modified, and deleted files through persistent fingerprints. It commits fingerprints for the current scope after analysis without storing full source snapshots; semantic review uses current source evidence and stored knowledge.
+10. Local CodeGraph supplies files, symbols, call relationships, and impact scope. Automatic semantic candidates come from changed accepted business evidence and cross-file behavior entries. Complete relevant symbols and call paths are batched by evidence capacity without a fixed question count; `--semantic --focus` can revisit files already scanned.
 11. When an agent hits retryable errors such as 429 / 529 / overloaded, Skills Seed retries according to `agent.retry`; the active progress line shows the agent error, failed call duration, and backoff wait, the terminal also prints a stable notice with the wait duration and API reason, then switches to `attempt N` when the next call starts.
 
 ### `skills-seed generate`
@@ -382,7 +379,10 @@ references/
   project-spec.md
   modules.md
   business-methods.md
+  business-methods/*.md
   patterns/*.md
+  patterns/business/*.md
+  patterns/business/items/*.md
 rules/*.md
 workflows/*.md
 scripts/workflows/
@@ -419,7 +419,7 @@ Preview files that would enter full or incremental analysis under the current co
 
 | Flag | Default | Description |
 |---|---:|---|
-| `--mode` | `full` | Preview mode: `full`/`first` for full selection, `incremental`/`current` for current snapshot diffs |
+| `--mode` | `full` | Preview mode: `full`/`first` for full selection, `incremental`/`current` for fingerprint changes |
 | `--focus`, `-f` | empty | Preview only files under these paths; may be repeated |
 | `--help`, `-h` | `false` | Show `preview files` help |
 
@@ -435,7 +435,7 @@ skills-seed preview files --mode incremental --focus internal/service
 #### Notes
 
 1. `preview files` shares the file-filtering policy used by `learn current`, so it shows which files would enter learning analysis.
-2. `--mode incremental` shows added, modified, and deleted candidates from the current file snapshot. Without an existing snapshot, the result is close to first-run learning scope.
+2. `--mode incremental` shows added, modified, and deleted candidates from saved file fingerprints. On the first run, the result is close to the full learning scope.
 3. The preview result is written to `.skills-seed/runtime/preview/files/`, and the terminal prints only the report directory and file name. You can delete the report after inspection.
 
 ### `skills-seed patterns`
@@ -540,7 +540,7 @@ skills-seed patterns show business-create-order --format json
 
 #### Command Overview
 
-Show the compatibility profile file that stores the project map. It lives at `.skills-seed/store/documents/project-profile.json` and generates `references/project-overview.md`. `learn current --profile auto` refreshes authority rules and the project map when the map is missing or authoritative input content changes; `--profile refresh` forces a refresh.
+Show the compatibility profile file that stores the project map. It lives at `.skills-seed/store/documents/project-profile.json` and generates `references/project-overview.md`. Project profiles are produced deterministically from saved knowledge and workspace relationships; `profile show` only reads the saved profile.
 
 #### Command Forms
 
@@ -558,15 +558,13 @@ Show the compatibility profile file that stores the project map. It lives at `.s
 
 ```bash
 skills-seed profile show
-skills-seed learn current --profile auto
-skills-seed learn current --profile refresh
 ```
 
 #### Notes
 
 1. `profile show` is useful for quickly checking the current profile.
-2. Authority-rule and project-map refresh belongs to current learning. In `auto` mode, the decision uses project-map presence and authoritative input content versions rather than agent-reported input boundaries.
-3. Refresh first extracts explicit authority rules, then an independent Agent rereads the same authoritative sources to review omissions and candidate wording. Both stages return complete section results. Build scripts, CI, and automation declarations may describe current implementation, but cannot independently grant command-execution permission to an Agent.
+2. Project profiles are generated from saved local knowledge and workspace relationships without an extra AI call.
+3. Business-semantic supplements retain source evidence and review decisions; build scripts, CI, and automation declarations may provide context but cannot independently grant command-execution permission to an Agent.
 
 ### `skills-seed rule`
 
@@ -736,7 +734,7 @@ skills-seed log
 
 1. `sync`, `learn current`, and `generate skills` write runtime records.
 2. Workspace roots merge child-project runtime records before display.
-3. Detailed diagnostic logs remain under `.skills-seed/runtime/logs/` for troubleshooting.
+3. File diagnostics are disabled by default. Set `logging.enabled: true` for troubleshooting logs under `.skills-seed/runtime/logs/`; terminal messages and run records remain available.
 
 ### `skills-seed help`
 

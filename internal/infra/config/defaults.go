@@ -118,7 +118,7 @@ func DefaultExcludePatterns() []string {
 
 // LearnBuiltinExcludePatterns 返回学习阶段必须排除的内置目录，防止分析 Git 元数据和已生成的技能产物。
 func LearnBuiltinExcludePatterns() []string {
-	return []string{".git/**", ".skills-seed/**", ".claude/**", ".agents/**"}
+	return []string{".git/**", ".skills-seed/**", ".codegraph/**", ".claude/**", ".agents/**"}
 }
 
 // LearnExcludePatterns 合并用户配置排除规则和生成的 Skills 输出目录，用于 learn/current 的文件选择。

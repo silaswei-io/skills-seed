@@ -8,7 +8,6 @@ import (
 
 func TestWorkspaceParsersRejectInvalidJSON(t *testing.T) {
 	for name, parse := range map[string]func(string) error{
-		"plan":      func(output string) error { _, err := ParsePlanLearningAgendaResult(output); return err },
 		"normalize": func(output string) error { _, err := ParseNormalizePatternsResult(output); return err },
 		"profile":   func(output string) error { _, err := ParseWorkspaceProfile(output); return err },
 		"spec":      func(output string) error { _, err := ParseWorkspaceSpec(output); return err },

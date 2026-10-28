@@ -50,7 +50,7 @@ func TestGenerateSkillsDoesNotSkipWhenWorkflowScriptChanges(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(patternRepo, nil, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}, workflowRepo, nil)
 	outputPath := t.TempDir()
@@ -89,7 +89,7 @@ func TestGenerateSkillsRemovesDeletedWorkflowOutputs(t *testing.T) {
 			return &domain.ProjectProfile{ProjectName: "test", Language: "go", Summary: "demo"}, nil
 		},
 	}
-	svc := NewGeneratorService(patternRepo, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(patternRepo, nil, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}, workflowRepo, nil)
 	outputPath := t.TempDir()
@@ -136,7 +136,7 @@ func TestGenerateSkillsWritesUserWorkflowsAndScripts(t *testing.T) {
 	scriptPath := filepath.Join(seedPath, "workflows", "deploy", "scripts", "smoke-test.sh")
 	require.NoError(t, os.WriteFile(scriptPath, []byte("#!/bin/sh\necho ok\n"), 0755))
 
-	svc := NewGeneratorService(mockPattern, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
+	svc := NewGeneratorService(mockPattern, nil, mockProfile, skills.NewLoader("zh-CN"), &mocks.MockConfigReader{
 		ProjectCfg: config.ProjectConfig{Name: "test", Language: "go"},
 	}, workflowRepo, nil)
 	outputPath := t.TempDir()

@@ -60,6 +60,9 @@ func Similarity(left, right domain.Pattern) float64 {
 	if left.HighRiskOperational() != right.HighRiskOperational() {
 		return 0
 	}
+	if left.BusinessMethod != nil && right.BusinessMethod != nil && !businessMethodOverlap(left.BusinessMethod, right.BusinessMethod) {
+		return 0
+	}
 
 	score := 0.0
 	if left.Category != "" && left.Category == right.Category {
@@ -74,13 +77,14 @@ func Similarity(left, right domain.Pattern) float64 {
 	sharedEvidence := sharedEvidenceCount(left, right)
 	evidenceOverlap := evidenceOverlap(left, right)
 	score += 0.24 * evidenceOverlap
-	if sharedEvidence >= 2 {
+	claimOverlap := jaccard(Tokens(left.Name+" "+left.Rule), Tokens(right.Name+" "+right.Rule))
+	if sharedEvidence >= 2 && claimOverlap >= 0.3 {
 		score += 0.16
 		if score < mergeThreshold {
 			score = mergeThreshold
 		}
 	}
-	score += 0.26 * jaccard(Tokens(left.Name+" "+left.Rule), Tokens(right.Name+" "+right.Rule))
+	score += 0.26 * claimOverlap
 	score += 0.16 * jaccard(Tokens(left.Description), Tokens(right.Description))
 	score += 0.06 * jaccard(Tokens(left.GoodExample), Tokens(right.GoodExample))
 
@@ -136,9 +140,6 @@ func MergeKeepingBest(left, right domain.Pattern) domain.Pattern {
 	if primary.BusinessMethod == nil {
 		primary.BusinessMethod = secondary.BusinessMethod
 	}
-	if primary.DevelopmentFocus == nil {
-		primary.DevelopmentFocus = secondary.DevelopmentFocus.Clone()
-	}
 	primary.EvidenceLocations = mergeEvidenceLocations(primary.EvidenceLocations, secondary.EvidenceLocations)
 	primary.RefreshMetrics()
 	return primary
@@ -151,7 +152,6 @@ func WithSources(pattern domain.Pattern, mergedFrom []string) domain.Pattern {
 	pattern.Merged = len(pattern.MergedFrom) > 1
 	pattern.KnowledgeFlags = append([]string(nil), pattern.KnowledgeFlags...)
 	pattern.BusinessMethod = cloneBusinessMethod(pattern.BusinessMethod)
-	pattern.DevelopmentFocus = pattern.DevelopmentFocus.Clone()
 	pattern.EvidenceLocations = append([]domain.PatternEvidenceLocation(nil), pattern.EvidenceLocations...)
 	return pattern
 }
@@ -360,16 +360,11 @@ func businessMethodOverlap(left, right *domain.BusinessMethod) bool {
 	if left == nil || right == nil {
 		return false
 	}
-	if strings.TrimSpace(left.Name) != "" && strings.TrimSpace(left.Name) == strings.TrimSpace(right.Name) {
-		return true
+	if left.DisplayLocation() != "" && right.DisplayLocation() != "" {
+		return left.DisplayLocation() == right.DisplayLocation() && strings.TrimSpace(left.Name) == strings.TrimSpace(right.Name)
 	}
-	if strings.TrimSpace(left.Function) != "" && strings.TrimSpace(left.Function) == strings.TrimSpace(right.Function) {
-		return true
-	}
-	if left.DisplayLocation() != "" && left.DisplayLocation() == right.DisplayLocation() {
-		return true
-	}
-	return false
+	return strings.TrimSpace(left.Name) != "" && strings.TrimSpace(left.Name) == strings.TrimSpace(right.Name) &&
+		strings.TrimSpace(left.Function) != "" && strings.TrimSpace(left.Function) == strings.TrimSpace(right.Function)
 }
 
 func evidenceOverlap(left, right domain.Pattern) float64 {

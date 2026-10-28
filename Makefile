@@ -1,4 +1,4 @@
-.PHONY: build test clean format lint install run-init run-learn run-check run-generate
+.PHONY: bundle build test clean format lint install run-init run-learn run-check run-generate
 
 # 项目名称
 PROJECT_NAME := skills-seed
@@ -19,14 +19,18 @@ CMD_DIR := cmd/skills-seed
 # 默认目标
 .DEFAULT_GOAL := build
 
+# 内嵌固定版本 CodeGraph，运行时无需安装 Node/npm。
+bundle:
+	python3 scripts/bundle-codegraph.py $(shell go env GOOS) $(shell go env GOARCH)
+
 # 构建
-build:
+build: bundle
 	@echo "构建 $(PROJECT_NAME)..."
 	$(GOBUILD) -o $(BINARY) ./$(CMD_DIR)
 	@echo "✓ 构建完成: $(BINARY)"
 
 # 安装
-install:
+install: bundle
 	@echo "安装 $(PROJECT_NAME)..."
 	$(GOCMD) install ./$(CMD_DIR)
 	@echo "✓ 安装完成"

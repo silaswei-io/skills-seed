@@ -1,0 +1,6 @@
+# {{.Title}}
+
+These reviewed entries share a responsibility theme. Each retains its own applicability and source evidence; open only the relevant detail.
+
+{{range .Items}}- [{{.Name}}]({{.ReferencePath}}){{with .EvidenceLocations}}: `{{(index . 0).DisplayLocation}}`{{end}}
+{{end}}

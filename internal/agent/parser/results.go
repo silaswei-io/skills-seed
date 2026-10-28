@@ -40,6 +40,28 @@ func ParseOptimizeContentResult(output string) (*agent.OptimizeContentResult, er
 	}, nil
 }
 
+// ParseSemanticScreenResult 校验筛选回执，空列表表示所有候选继续分析。
+func ParseSemanticScreenResult(output string) (*agent.SemanticScreenResult, error) {
+	var payload aicontract.SemanticScreenOutput
+	if err := parseJSONPayload(output, &payload); err != nil {
+		return nil, err
+	}
+	if payload.Skip == nil {
+		return nil, missingRequiredOutputField("skip")
+	}
+	result := &agent.SemanticScreenResult{Skip: make([]agent.SemanticScreenDecision, 0, len(payload.Skip))}
+	seen := make(map[string]bool, len(payload.Skip))
+	for _, item := range payload.Skip {
+		path, reason := strings.TrimSpace(item.Path), strings.TrimSpace(item.Reason)
+		if path == "" || reason == "" || seen[path] {
+			return nil, fmt.Errorf("semantic screen has an invalid or duplicate path/reason: %q", item.Path)
+		}
+		seen[path] = true
+		result.Skip = append(result.Skip, agent.SemanticScreenDecision{Path: path, Reason: reason})
+	}
+	return result, nil
+}
+
 // ParseAnalyzeProjectResult 解析项目分析结果。
 func ParseAnalyzeProjectResult(output string) (*agent.AnalyzeProjectResult, error) {
 	var result aicontract.ProjectProfileOutput
@@ -179,7 +201,7 @@ func ParseAnalyzeCurrentCodebaseBatchResult(output string) (*agent.AnalyzeCurren
 			ProfileRefreshRecommended: profileRefreshRecommendationToAgent(*unit.ProfileRefreshRecommended),
 		})
 	}
-	return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: focuses}, nil
+	return &agent.AnalyzeCurrentCodebaseBatchResult{Focuses: focuses, Assessment: payload.Assessment}, nil
 }
 
 // ParseAnalyzeCurrentDeltaBatchResult 解析 diff 锚定增量学习结果。
@@ -207,6 +229,7 @@ func ParseAnalyzeCurrentDeltaBatchResult(output string) (*agent.AnalyzeCurrentDe
 
 	now := time.Now()
 	return &agent.AnalyzeCurrentDeltaBatchResult{
+		Assessment:                payload.Assessment,
 		Changes:                   knowledgeChangesToDomain(payload.KnowledgeChanges, now),
 		ProfileRefreshRecommended: profileRefreshRecommendationToAgent(*payload.ProfileRefreshRecommended),
 	}, nil

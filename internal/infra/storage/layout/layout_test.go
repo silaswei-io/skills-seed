@@ -28,7 +28,6 @@ func TestLayoutPaths(t *testing.T) {
 	require.Equal(t, filepath.Join(seedPath, "store", "documents", "workspace-spec.json"), l.WorkspaceSpec())
 	require.Equal(t, filepath.Join(seedPath, "store", "documents", "state.json"), l.State())
 	require.Equal(t, filepath.Join(seedPath, "store", "documents", "change-log.json"), l.ChangeLog())
-	require.Equal(t, filepath.Join(seedPath, "cache", "snapshots"), l.Snapshots())
 	require.Equal(t, filepath.Join(seedPath, "cache", "commands", "learn", "state.json"), l.CommandState("learn"))
 	require.Equal(t, filepath.Join(seedPath, "runtime", "logs"), l.RuntimeLogs())
 	require.Equal(t, filepath.Join(seedPath, "rules"), l.Rules())

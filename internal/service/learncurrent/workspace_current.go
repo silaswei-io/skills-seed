@@ -63,6 +63,7 @@ type learnWorkspaceCurrentRun struct {
 	consoleMu       sync.Mutex
 	resultMu        sync.Mutex
 	changedProjects []string
+	pendingFiles    int
 }
 
 type workspaceProjectProgress struct {
@@ -98,7 +99,7 @@ func RunWorkspaceRelationships(cont *container.Container, userContext string) (b
 	if err != nil {
 		return false, err
 	}
-	if err := commandutil.MarkLearned(run.ctx, run.cont); err != nil {
+	if err := markWorkspaceLearning(run.ctx, run.cont); err != nil {
 		return false, err
 	}
 	return relationshipsChanged, nil
@@ -121,7 +122,7 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 	if err != nil {
 		return domain.LearnCurrentResult{}, err
 	}
-	if err := commandutil.MarkLearned(r.ctx, r.cont); err != nil {
+	if err := markWorkspaceLearning(r.ctx, r.cont); err != nil {
 		return domain.LearnCurrentResult{}, err
 	}
 
@@ -132,6 +133,7 @@ func (r *learnWorkspaceCurrentRun) execute() (domain.LearnCurrentResult, error) 
 		"projects_count", len(r.workspaceConfig.Projects),
 	)
 	result := domain.LearnCurrentResult{Summary: domain.LearnCurrentSummary{
+		PendingFiles:     r.pendingFiles,
 		Projects:         len(r.workspaceConfig.Projects),
 		ChangedProjects:  len(r.changedProjects),
 		WorkspaceChanged: relationshipsChanged,
@@ -202,7 +204,7 @@ func (r *learnWorkspaceCurrentRun) runProject(ctx context.Context, project confi
 		return err
 	}
 	defer childCont.Close()
-	r.logProjectStarted(project, childCont)
+	r.logProjectStarted(project)
 
 	scope := project.ID
 	if scope == "" {
@@ -224,12 +226,9 @@ func (r *learnWorkspaceCurrentRun) runProject(ctx context.Context, project confi
 
 func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *container.Container, scope string, projectProgress *workspaceProjectProgress) (*learnCurrentProjectResult, string, error) {
 	loggingConfig := childCont.ConfigRepo.GetLoggingConfig()
-	logDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
-	logLevel := logger.ParseLevel(loggingConfig.Level)
-
 	var result *learnCurrentProjectResult
 	var logPath string
-	err := logger.WithScopedLog(ctx, logDir, "learn", logLevel, loggingConfig.MaxLogFiles, func(scopedCtx context.Context, scopedLogPath string) error {
+	runChild := func(scopedCtx context.Context, scopedLogPath string) error {
 		logPath = scopedLogPath
 		var err error
 		result, err = runLearnCurrentProjectWithOptions(scopedCtx, childCont, learnCurrentProjectOptions{
@@ -242,17 +241,23 @@ func (r *learnWorkspaceCurrentRun) runChild(ctx context.Context, childCont *cont
 			skipRuntimeCleanup: true,
 			language:           r.opts.language,
 			focusPaths:         r.opts.focusPaths,
-			profileMode:        r.opts.profileMode,
 			stateScope:         r.opts.stateScope,
 			scopeKind:          runjournal.ScopeChild,
 			force:              r.opts.force,
 		})
 		return err
-	})
+	}
+	var err error
+	if loggingConfig.Enabled {
+		logDir := filepath.Join(childCont.SeedPath, loggingConfig.LogsPath)
+		err = logger.WithScopedLog(ctx, logDir, "learn", logger.ParseLevel(loggingConfig.Level), loggingConfig.MaxLogFiles, runChild)
+	} else {
+		err = runChild(ctx, "")
+	}
 	return result, logPath, err
 }
 
-func (r *learnWorkspaceCurrentRun) logProjectStarted(project config.WorkspaceProjectConfig, childCont *container.Container) {
+func (r *learnWorkspaceCurrentRun) logProjectStarted(project config.WorkspaceProjectConfig) {
 	if !r.showDetails {
 		return
 	}
@@ -260,13 +265,13 @@ func (r *learnWorkspaceCurrentRun) logProjectStarted(project config.WorkspacePro
 	defer r.consoleMu.Unlock()
 	logger.Info(i18n.GetWithParams("LearnWorkspaceProjectStarted", map[string]interface{}{
 		"ProjectName": project.ID,
-		"LogPath":     workspaceProjectLogDir(childCont),
 	}))
 }
 
 func (r *learnWorkspaceCurrentRun) recordProjectResult(project config.WorkspaceProjectConfig, scope, logPath string, result *learnCurrentProjectResult) {
 	r.resultMu.Lock()
-	if result.savedCount > 0 || result.retiredCount > 0 {
+	r.pendingFiles += result.pendingCount
+	if result.navigationUpdated || result.savedCount > 0 || result.retiredCount > 0 {
 		r.changedProjects = append(r.changedProjects, scope)
 	}
 	r.resultMu.Unlock()
@@ -321,11 +326,6 @@ func (p *workspaceProjectProgress) fail() {
 	}
 }
 
-func workspaceProjectLogDir(cont *container.Container) string {
-	loggingConfig := cont.ConfigRepo.GetLoggingConfig()
-	return filepath.Join(cont.SeedPath, loggingConfig.LogsPath)
-}
-
 func recordWorkspaceLearnJournal(cont *container.Container, result domain.LearnCurrentResult, startedAt time.Time) error {
 	if cont == nil || cont.ConfigRepo == nil {
 		return nil
@@ -349,4 +349,8 @@ func recordWorkspaceLearnJournal(cont *container.Container, result domain.LearnC
 
 func pauseAfterFastWorkspaceChildStep(startedAt time.Time) {
 	progress.PauseAfterFastStep(startedAt, sleepAfterWorkspaceChildStep)
+}
+
+func markWorkspaceLearning(ctx context.Context, cont *container.Container) error {
+	return commandutil.LockConfiguredMode(ctx, cont)
 }

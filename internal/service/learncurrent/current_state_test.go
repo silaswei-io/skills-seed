@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/silaswei-io/skills-seed/internal/command/commandutil"
 	"github.com/silaswei-io/skills-seed/internal/domain"
@@ -286,29 +285,6 @@ func TestCheckpointFocusResultsMakesCompletedFocusRecoverable(t *testing.T) {
 	require.Equal(t, "second", pending[0].ID)
 }
 
-func TestParallelAnalysisProgressShowsFocusStageAndElapsedTime(t *testing.T) {
-	require.NoError(t, i18n.Init("zh-CN"))
-	focus := domain.EvidenceFocus{ID: "auth", Name: "认证授权", EntryPaths: []string{"internal/auth.go"}}
-	state := commandstate.NewState(commandStateLearnCurrent, "demo", "go", "", nil, nil, []domain.EvidenceFocus{focus})
-	progress := newLearnCurrentParallelAnalysisProgress(&learnCurrentProjectRun{}, "分析", state, []learnCurrentBatch{{
-		index:   0,
-		focuses: []indexedEvidenceFocus{{index: 0, focus: focus}},
-	}}, 1)
-	progress.active[0] = learnCurrentParallelFocusStatus{
-		base:      "batch-001 焦点 1/1 认证授权",
-		stage:     i18n.GetWithParams("LearnCurrentFocusStageKnowledgeReview", map[string]interface{}{"Candidates": 3}),
-		startedAt: time.Now().Add(-2 * time.Second),
-	}
-
-	lines := progress.activeLines()
-
-	require.Equal(t, 1, len(lines))
-	require.Contains(t, lines[0], "• batch-001")
-	require.Contains(t, lines[0], "焦点 1/1 认证授权")
-	require.Contains(t, lines[0], "独立知识审查 · 候选 3")
-	require.Contains(t, lines[0], "(2s)")
-}
-
 func TestValidateCompletedAnalysisRequiresEveryPlannedUnit(t *testing.T) {
 	focuses := []domain.EvidenceFocus{
 		{ID: "auth", Name: "Auth", EntryPaths: []string{"internal/shared.go"}},
@@ -474,8 +450,6 @@ func TestBuildLearnCurrentResumeSummaryUsesStoredInputMetrics(t *testing.T) {
 	require.Equal(t, "1", summary.SelectedFiles)
 	require.Equal(t, 1, summary.PendingAnalyzeFiles)
 	require.Equal(t, 1, summary.Focuses)
-	require.Equal(t, 1, summary.DevelopmentFocuses)
-	require.Equal(t, 0, summary.CoverageFocuses)
 }
 
 func TestBuildLearnCurrentResumeSummaryDerivesMissingMetrics(t *testing.T) {

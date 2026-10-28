@@ -204,7 +204,6 @@ func (g *WorkspaceGenerator) writeWorkspaceRootSkill(ctx context.Context, output
 		p := skillgen.NewPlan(staging)
 		p.AddFile("SKILL.md", skillgen.CatalogTemplate, "workspace-skill", data)
 		p.AgentMetadataData = data
-		p.AddDir("references")
 		p.AddFile("references/workspace-overview.md", skillgen.CatalogTemplate, "workspace-reference-overview", data)
 		p.AddFile("references/cross-project-rules.md", skillgen.CatalogTemplate, "workspace-reference-cross-project-rules", data)
 		if err := g.renderer.Render(ctx, p); err != nil {

@@ -27,3 +27,11 @@ func TestLearnedCoverageSummaryReportsTotalWithoutFixedPreview(t *testing.T) {
 	assert.Contains(t, summary, "已覆盖 9 个模块/责任域")
 	assert.Contains(t, summary, "完整导航见关键模块")
 }
+
+func TestCapabilityEntriesDoNotInventModuleCoverage(t *testing.T) {
+	profile := &domain.ProjectProfile{BusinessMethods: []domain.BusinessMethod{{Name: "Reserve"}, {Name: "Cancel"}}}
+	refs := referenceAvailability(profile, nil, true)
+	assert.True(t, refs.BusinessMethods)
+	assert.False(t, refs.ProjectOverview)
+	assert.Zero(t, learnedResponsibilityTotal(profile))
+}

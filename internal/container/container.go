@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -123,6 +124,10 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", i18n.Get("ContainerLoadConfigFailed"), err)
 	}
+	// 旧版本保存的完整源码快照不再使用，打开项目时移除该缓存副本。
+	if err := os.RemoveAll(layout.New(seedPath).Cache("snapshots")); err != nil {
+		return nil, fmt.Errorf("remove obsolete source snapshots: %w", err)
+	}
 	cfg := configRepo.Get()
 
 	// 2. 初始化 i18n
@@ -173,7 +178,7 @@ func NewContainer(ctx context.Context, seedPath string) (*Container, error) {
 	}
 	workflowSvc := workflowsvc.NewService(workflowRepo, agentImpl, projectContext)
 	ruleSvc := rulesvc.NewService(ruleRepo, agentImpl, projectContext)
-	generatorSvc := generator.NewGeneratorService(patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo, ruleRepo)
+	generatorSvc := generator.NewGeneratorService(patternRepo, patternRepo, profileRepo, skillsLoader, configRepo, workflowRepo, ruleRepo)
 	workspaceGeneratorSvc := ws.NewWorkspaceGenerator(skillsLoader, configRepo, workspaceProfileRepo, workspaceSpecRepo, workflowRepo, ruleRepo)
 
 	return &Container{

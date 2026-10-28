@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCmd_CurrentIncludesFocusAndProfileFlags(t *testing.T) {
+func TestCmd_CurrentIncludesFocusAndContextFlags(t *testing.T) {
 	cmd := Cmd(&container.Container{})
 	currentCmd, _, err := cmd.Find([]string{"current"})
 	require.NoError(t, err)
@@ -15,10 +15,6 @@ func TestCmd_CurrentIncludesFocusAndProfileFlags(t *testing.T) {
 	focusFlag := currentCmd.Flags().Lookup("focus")
 	require.NotNil(t, focusFlag)
 	require.Equal(t, "f", focusFlag.Shorthand)
-
-	profileFlag := currentCmd.Flags().Lookup("profile")
-	require.NotNil(t, profileFlag)
-	require.Equal(t, "auto", profileFlag.DefValue)
 
 	contextFlag := currentCmd.Flags().Lookup("context")
 	require.NotNil(t, contextFlag)

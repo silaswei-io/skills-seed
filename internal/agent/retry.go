@@ -192,7 +192,7 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 		return zero, fmt.Errorf("agent retry call is nil")
 	}
 	maxRetries := 0
-	if opts.Policy != nil {
+	if opts.Policy != nil && CurrentLearningSupplement(ctx) == nil {
 		maxRetries = opts.Policy.EffectiveMaxRetries()
 	}
 	retried := false
@@ -206,7 +206,7 @@ func RunRetryingCall[T any](ctx context.Context, opts RetryingCallOptions[T]) (T
 				MaxRetries: maxRetries,
 			})
 		}
-		release, err := acquireCall(ctx, opts.Operation)
+		release, err := acquireCall(ctx)
 		if err != nil {
 			return zero, err
 		}

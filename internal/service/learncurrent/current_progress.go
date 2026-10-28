@@ -75,18 +75,6 @@ func shortenRunes(value string, maxRunes int) string {
 	return string(runes[:maxRunes-3]) + "..."
 }
 
-func learnCurrentFocusProgress(state *commandstate.State, fallbackIndex, fallbackTotal int, focus domain.EvidenceFocus) (int, int) {
-	if state == nil || len(state.Agenda.Focuses) == 0 {
-		return fallbackIndex, fallbackTotal
-	}
-	for index, planned := range state.Agenda.Focuses {
-		if evidenceFocusSame(planned, focus) {
-			return index + 1, len(state.Agenda.Focuses)
-		}
-	}
-	return fallbackIndex, len(state.Agenda.Focuses)
-}
-
 func evidenceFocusSame(a, b domain.EvidenceFocus) bool {
 	if a.ID != "" || b.ID != "" {
 		return a.ID == b.ID
@@ -158,8 +146,6 @@ func (r *learnCurrentProjectRun) logDetectedChanges(startedAt time.Time) {
 				"SelectedFiles":       r.resumeSummary.SelectedFiles,
 				"PendingAnalyzeFiles": r.resumeSummary.PendingAnalyzeFiles,
 				"Focuses":             r.resumeSummary.Focuses,
-				"DevelopmentFocuses":  r.resumeSummary.DevelopmentFocuses,
-				"CoverageFocuses":     r.resumeSummary.CoverageFocuses,
 			}))
 		} else {
 			logger.Info(i18n.GetWithParams("LearnCurrentIncrementalSummary", map[string]interface{}{

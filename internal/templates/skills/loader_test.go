@@ -27,6 +27,7 @@ func TestLoader_Render(t *testing.T) {
 		"SkillName":           "test-project-dev",
 		"SkillDescription":    "修改 test-project go 代码且涉及项目约定时使用",
 		"Language":            "go",
+		"HasNavigation":       false,
 		"HasKnowledge":        true,
 		"HasPatterns":         true,
 		"PatternCount":        10,
@@ -46,9 +47,6 @@ func TestLoader_Render(t *testing.T) {
 		"BusinessRules":  []string{"业务规则1", "业务规则2"},
 		"BestPractices":  []string{"最佳实践1", "最佳实践2"},
 		"CommonPatterns": []string{"通用模式1", "通用模式2"},
-		"KeyInsights": []string{
-			"错误处理是跨层一致性核心",
-		},
 		"ImprovementSuggestions": []string{
 			"为外部调用补充超时测试",
 		},
@@ -59,7 +57,6 @@ func TestLoader_Render(t *testing.T) {
 			{"Name": "部署工作流", "Path": "./workflows/deploy.md", "Description": "发布前后检查", "Summary": "发布前后检查", "RouteTerms": []string{"发布", "验证"}},
 		},
 		"RuleReferences": []map[string]string{},
-		"StateSummaries": []string{"Task: 保持任务状态迁移。"},
 		"CommandRules":   []domain.EngineeringRule{},
 		"References":     fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -74,7 +71,6 @@ func TestLoader_Render(t *testing.T) {
 				},
 			},
 		},
-		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -97,7 +93,7 @@ func TestLoader_Render(t *testing.T) {
 	assert.Contains(t, content, "发布")
 	assert.NotContains(t, content, "验证策略")
 	assert.NotContains(t, content, "task verify")
-	assert.Contains(t, content, "错误处理是跨层一致性核心")
+	assert.NotContains(t, content, "错误处理是跨层一致性核心")
 	assert.NotContains(t, content, "为外部调用补充超时测试")
 	assert.NotContains(t, content, "references 与当前代码冲突时，以当前代码为准")
 }
@@ -113,6 +109,7 @@ func TestLoader_Render_English(t *testing.T) {
 		"SkillName":           "test-project-dev",
 		"SkillDescription":    "Use when modifying test-project go code involving project conventions",
 		"Language":            "go",
+		"HasNavigation":       false,
 		"HasKnowledge":        true,
 		"HasPatterns":         true,
 		"PatternCount":        10,
@@ -124,18 +121,15 @@ func TestLoader_Render_English(t *testing.T) {
 		"BusinessRules":       []string{},
 		"BestPractices":       []string{},
 		"CommonPatterns":      []string{},
-		"KeyInsights":         []string{"Error handling is a cross-layer consistency concern"},
 		"ImprovementSuggestions": []string{
 			"Add timeout tests for external calls",
 		},
 		"OverviewReferences": []ReferenceItem{},
 		"WorkflowReferences": []map[string]string{},
 		"RuleReferences":     []map[string]string{},
-		"StateSummaries":     []string{"Task: preserve task state transitions."},
 		"CommandRules":       []domain.EngineeringRule{},
 		"References":         fullReferenceAvailability(),
 		"ReferenceGroups":    []ReferenceGroup{},
-		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 
 	content, err := loader.Render("project-skill", data)
@@ -148,7 +142,7 @@ func TestLoader_Render_English(t *testing.T) {
 	assert.NotContains(t, content, "Common Workflows")
 	assert.NotContains(t, content, "Validation Strategy")
 	assert.NotContains(t, content, "task verify")
-	assert.Contains(t, content, "Error handling is a cross-layer consistency concern")
+	assert.NotContains(t, content, "Error handling is a cross-layer consistency concern")
 	assert.NotContains(t, content, "Add timeout tests for external calls")
 }
 
@@ -241,17 +235,11 @@ func TestLoader_RenderEnglishWorkspaceSkillHasBroadTriggerDescription(t *testing
 func TestLoader_OmitsVisibleSkillsSeedGeneratedNoticeByDefault(t *testing.T) {
 	loader := NewLoader("zh-CN")
 
-	content, err := loader.RenderPattern("business", map[string]interface{}{
-		"Category":          "business",
-		"Priority":          1,
-		"PatternCount":      9,
-		"Confidence":        90.0,
+	content, err := loader.RenderRelative("project/references/patterns/business-index", map[string]interface{}{
+		"PatternCount":      1,
 		"LastUpdated":       "2026-06-08 12:00:00",
-		"Summary":           "业务模式",
-		"PatternObjects":    []domain.Pattern{*domain.NewPattern("p1", "业务规则", domain.CategoryBusiness)},
-		"ClaimGroups":       []interface{}{},
-		"UsageScenes":       []string{},
-		"CodeFenceLanguage": "go",
+		"Singles":           []map[string]any{{"Name": "业务规则", "ReferencePath": "./business/items/business-rule.md", "EvidenceLocations": []domain.PatternEvidenceLocation{}}},
+		"Groups":            []interface{}{},
 		"RelatedReferences": []interface{}{},
 	})
 	require.NoError(t, err)
@@ -337,7 +325,8 @@ func TestLoader_RenderReferenceFile(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Contains(t, content, "Demo")
-	assert.Contains(t, content, "func Demo()")
+	assert.Contains(t, content, "./business-methods/demo.md")
+	assert.NotContains(t, content, "func Demo()")
 }
 
 func TestLoader_RenderPatternReferencesDoNotExpandExamples(t *testing.T) {
@@ -367,28 +356,24 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 		{
 			locale: "zh-CN",
 			indexChecks: []string{
-				"用户动作",
-				"规则策略",
-				"不要只按代码包名或技术缩写匹配",
-				"同义业务动作/状态变化",
+				"业务动作",
+				"改动路径",
+				"直接入口",
 			},
 			detailChecks: []string{
-				"同义业务动作",
-				"入口渠道或外部依赖",
+				"已审查的业务判断",
 				"按证据定位并优先复用已有实现",
 			},
 		},
 		{
 			locale: "en-US",
 			indexChecks: []string{
-				"user actions",
-				"rules or policies",
-				"Do not match only by package names or technical abbreviations",
-				"synonymous business actions or state changes",
+				"business action",
+				"changed path",
+				"Direct Entries",
 			},
 			detailChecks: []string{
-				"synonymous business actions",
-				"entry channels, or external dependencies",
+				"reviewed business decision",
 				"Use the evidence below to locate and prefer existing implementations",
 			},
 		},
@@ -407,29 +392,10 @@ func TestLoader_RenderBusinessReferencesIncludeRequestLanguageRouting(t *testing
 				"Summary":           "",
 				"Category":          "business",
 				"CodeFenceLanguage": "go",
-				"DetailGroups": []map[string]interface{}{
-					{
-						"ID":    "resource",
-						"Title": "Resource",
-						"Path":  "./business/resource.md",
-						"Summary": map[string]interface{}{
-							"Description": "资源业务规则",
-							"Keywords":    []string{"审批", "状态"},
-							"PrimaryPath": "internal/service/resource.go",
-							"IsFallback":  false,
-						},
-						"Patterns": []domain.Pattern{*pattern},
-					},
-				},
-				"InlineGroups": []interface{}{},
-				"GroupTitle":   "Resource",
-				"GroupSummary": map[string]interface{}{
-					"Description": "资源业务规则",
-					"Keywords":    []string{"审批", "状态"},
-					"PrimaryPath": "internal/service/resource.go",
-					"IsFallback":  false,
-				},
-				"PatternObjects": []domain.Pattern{*pattern},
+				"Groups":            []map[string]interface{}{},
+				"Singles":           []map[string]interface{}{{"Name": pattern.Name, "EvidenceLocations": []domain.PatternEvidenceLocation{}, "ReferencePath": "./business/items/resource-approval.md"}},
+				"GroupTitle":        "Resource",
+				"PatternObjects":    []domain.Pattern{*pattern},
 				"RelatedReferences": []interface{}{
 					map[string]string{
 						"Title":  "API 模式",
@@ -506,7 +472,6 @@ func TestLoader_GetLocale(t *testing.T) {
 func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 	categories := []string{
 		"api",
-		"business",
 		"concurrency",
 		"config",
 		"database",
@@ -534,7 +499,7 @@ func TestLoader_RenderAllSkillTemplates(t *testing.T) {
 					require.NoError(t, err)
 					require.NotEmpty(t, overview)
 
-					for _, reference := range []string{"business-methods", "modules", "common-utils", "project-spec"} {
+					for _, reference := range []string{"business-methods", "modules", "project-spec"} {
 						referenceContent, err := loader.Render("project-reference-"+reference, projectOverviewData())
 						require.NoError(t, err)
 						require.NotEmpty(t, referenceContent)
@@ -703,6 +668,7 @@ func fullSkillData() map[string]interface{} {
 		"SkillName":           "demo-dev",
 		"SkillDescription":    "修改、审查或扩展 demo go 代码且涉及项目特定约定时使用",
 		"Language":            "go",
+		"HasNavigation":       false,
 		"HasKnowledge":        true,
 		"HasPatterns":         true,
 		"PatternCount":        1,
@@ -714,7 +680,6 @@ func fullSkillData() map[string]interface{} {
 		"BusinessRules":       []string{"business rule"},
 		"BestPractices":       []string{"best practice"},
 		"CommonPatterns":      []string{"common pattern"},
-		"KeyInsights":         []string{"key insight"},
 		"ImprovementSuggestions": []string{
 			"improvement suggestion",
 		},
@@ -723,7 +688,6 @@ func fullSkillData() map[string]interface{} {
 		},
 		"WorkflowReferences": []map[string]string{},
 		"RuleReferences":     []map[string]string{},
-		"StateSummaries":     []string{"Task: 保持任务状态迁移。"},
 		"CommandRules":       []domain.EngineeringRule{},
 		"References":         fullReferenceAvailability(),
 		"ReferenceGroups": []ReferenceGroup{
@@ -738,7 +702,6 @@ func fullSkillData() map[string]interface{} {
 				},
 			},
 		},
-		"DevelopmentFocuses": []map[string]interface{}{},
 	}
 }
 
@@ -798,7 +761,6 @@ func projectOverviewData() map[string]interface{} {
 		"OverviewReferences": []ReferenceItem{
 			{Title: "业务方法", Path: "./business-methods.md", Description: "完整业务方法清单"},
 			{Title: "关键模块", Path: "./modules.md", Description: "完整模块清单"},
-			{Title: "通用工具", Path: "./common-utils.md", Description: "工具方法清单"},
 		},
 		"References":          fullReferenceAvailability(),
 		"KeyModules":          []domain.ModuleInfo{{Name: "service", Path: "internal/service", Description: "business layer", Responsibilities: []string{"orchestrate"}, Dependencies: []string{"domain"}, Dependents: []string{"command"}, KeyMethods: []string{"Run()"}}},
@@ -810,11 +772,11 @@ func projectOverviewData() map[string]interface{} {
 		"ScopePath":           "demo",
 		"WorkspaceRole":       "backend",
 		"HasBusinessPatterns": true,
-		"HasUtilityPatterns":  true,
 		"EngineeringRules": []domain.EngineeringRule{
 			{Title: "Validation", Rule: "Run task verify", Source: "AGENTS.md", Evidence: []string{"AGENTS.md"}},
 		},
 		"AuthorityCoverage": []domain.AuthorityCoverage{},
+		"AuthorityPaths":    []string{"AGENTS.md"},
 		"RuleReferences":    []map[string]string{},
 		"BusinessMethodIndex": map[string]interface{}{
 			"Total": 1,
@@ -857,6 +819,7 @@ func projectOverviewData() map[string]interface{} {
 					"Methods": []map[string]interface{}{
 						{
 							"DisplayName":               "Demo",
+							"ReferencePath":             "./business-methods/demo.md",
 							"Anchor":                    "demo",
 							"Module":                    "demo",
 							"Name":                      "Demo",
@@ -884,7 +847,6 @@ func fullReferenceAvailability() map[string]bool {
 		"ProjectOverview":  true,
 		"BusinessMethods":  true,
 		"KeyModules":       true,
-		"CommonUtils":      true,
 		"BusinessPatterns": true,
 	}
 }

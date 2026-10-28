@@ -11,20 +11,12 @@ import (
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 )
 
-// PlanLearningAgenda 规划当前代码学习的证据焦点议程。
-func PlanLearningAgenda(ctx context.Context, rt Runtime, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	output, _, err := call(ctx, rt, "LearningPackPlan", "learning-pack-plan", "skills-seed-learning-pack-plan", aicontract.ContractPlanLearningAgenda, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-plan", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
-		return agent.PlanLearningAgendaPromptData(inputs, req)
-	})
-	if err != nil {
-		return nil, err
-	}
-	return parser.ParsePlanLearningAgendaResult(output)
-}
-
 // NormalizePatterns 归并当前学习候选模式。
 func NormalizePatterns(ctx context.Context, rt Runtime, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error) {
 	output, _, err := call(ctx, rt, "LearningPatternNormalize", "learning-pattern-normalize", "skills-seed-learning-pattern-normalize", aicontract.ContractNormalizePatterns, agent.NewRuntimeTask(agent.RuntimeSlug("learning-pattern-normalize", "")), agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		if agent.CurrentLearningSupplement(ctx) != nil {
+			return supplementPromptData(ctx, req)
+		}
 		return agent.NormalizePatternsPromptData(inputs, req)
 	})
 	if err != nil {
@@ -37,6 +29,9 @@ func NormalizePatterns(ctx context.Context, rt Runtime, req *agent.NormalizePatt
 func ReviewKnowledge(ctx context.Context, rt Runtime, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-knowledge-review", req.RuntimeLabel))
 	output, _, err := callWithOptions(ctx, rt, agent.ReviewKnowledgeOperation(req), "learning-knowledge-review", agent.RuntimePromptInputPrefix("skills-seed-learning-knowledge-review", req.RuntimeLabel), aicontract.ContractReviewKnowledge, aicontract.StructuredOutputOptions{CandidateIDs: agent.ReviewKnowledgeCandidateIDs(req.Candidates)}, task, req.Conversation, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		if agent.CurrentLearningSupplement(ctx) != nil {
+			return supplementPromptData(ctx, req)
+		}
 		return agent.ReviewKnowledgePromptData(inputs, req)
 	})
 	if err != nil {
@@ -85,7 +80,6 @@ func AnalyzeCurrentFocusBatch(ctx context.Context, rt Runtime, req *agent.Analyz
 				EvidenceFocus:   focus.EvidenceFocus,
 				FocusPaths:      append([]string(nil), focus.FocusPaths...),
 				ContextFiles:    append([]agent.SampleFile(nil), focus.SampleFiles...),
-				DiffFiles:       append([]agent.DiffFileRef(nil), focus.DiffFiles...),
 				RelatedPatterns: append([]domain.Pattern(nil), focus.RelatedPatterns...),
 			})
 		}
@@ -123,7 +117,6 @@ func AnalyzeCurrentFocusBatch(ctx context.Context, rt Runtime, req *agent.Analyz
 				EvidenceFocus: focus.EvidenceFocus,
 				FocusPaths:    append([]string(nil), focus.FocusPaths...),
 				SampleFiles:   append([]agent.SampleFile(nil), focus.SampleFiles...),
-				DiffFiles:     append([]agent.DiffFileRef(nil), focus.DiffFiles...),
 			})
 		}
 		result, err := AnalyzeCurrentCodebaseBatch(ctx, rt, fullReq)
@@ -149,6 +142,9 @@ func AnalyzeCurrentFocusBatch(ctx context.Context, rt Runtime, req *agent.Analyz
 func AnalyzeCurrentCodebaseBatch(ctx context.Context, rt Runtime, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-pack-analyze", req.RuntimeLabel))
 	output, conversation, err := callWithOptions(ctx, rt, agent.AnalyzeCurrentCodebaseBatchOperation(req), "learning-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentCodebaseBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{Provider: rt.Name()}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		if agent.CurrentLearningSupplement(ctx) != nil {
+			return supplementPromptData(ctx, req)
+		}
 		return agent.AnalyzeCurrentCodebaseBatchPromptData(inputs, req)
 	})
 	if err != nil {
@@ -162,10 +158,13 @@ func AnalyzeCurrentCodebaseBatch(ctx context.Context, rt Runtime, req *agent.Ana
 	return result, agent.RequireResult(result, "AnalyzeCurrentCodebaseBatch")
 }
 
-// AnalyzeCurrentDeltaBatch 基于 diff 判断知识变化。
+// AnalyzeCurrentDeltaBatch 基于当前源码和已有知识判断变化。
 func AnalyzeCurrentDeltaBatch(ctx context.Context, rt Runtime, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error) {
 	task := agent.NewRuntimeTask(agent.RuntimeSlug("learning-delta-pack-analyze", req.RuntimeLabel))
 	output, _, err := callWithOptions(ctx, rt, agent.AnalyzeCurrentDeltaBatchOperation(req), "learning-delta-pack-analyze", agent.RuntimePromptInputPrefix("skills-seed-learning-delta-pack-analyze", req.RuntimeLabel), aicontract.ContractAnalyzeCurrentDeltaBatch, aicontract.StructuredOutputOptions{FocusIDs: req.FocusIDs()}, task, agent.Conversation{}, func(inputs *agent.PromptInputSession) (map[string]interface{}, error) {
+		if agent.CurrentLearningSupplement(ctx) != nil {
+			return supplementPromptData(ctx, req)
+		}
 		return agent.AnalyzeCurrentDeltaBatchPromptData(inputs, req)
 	})
 	if err != nil {

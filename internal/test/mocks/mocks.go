@@ -5,7 +5,6 @@ import (
 
 	"github.com/silaswei-io/skills-seed/internal/agent"
 	"github.com/silaswei-io/skills-seed/internal/domain"
-	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 )
 
@@ -17,9 +16,9 @@ type MockAgent struct {
 	RefreshProjectProfileFn   func(ctx context.Context, req *agent.AnalyzeProjectRequest) (*agent.AnalyzeProjectResult, error)
 	ExtractAuthorityFn        func(ctx context.Context, req *agent.ExtractAuthorityRequest) (*agent.ExtractAuthorityResult, error)
 	ReviewAuthorityFn         func(ctx context.Context, req *agent.ReviewAuthorityRequest) (*agent.ExtractAuthorityResult, error)
-	PlanLearningAgendaFn      func(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error)
 	NormalizePatternsFn       func(ctx context.Context, req *agent.NormalizePatternsRequest) (*agent.NormalizePatternsResult, error)
 	ReviewKnowledgeFn         func(ctx context.Context, req *agent.ReviewKnowledgeRequest) (*agent.ReviewKnowledgeResult, error)
+	ScreenSemanticGapsFn      func(ctx context.Context, req *agent.SemanticScreenRequest) (*agent.SemanticScreenResult, error)
 	AnalyzeCurrentCodebaseFn  func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error)
 	AnalyzeCurrentBatchFn     func(ctx context.Context, req *agent.AnalyzeCurrentCodebaseBatchRequest) (*agent.AnalyzeCurrentCodebaseBatchResult, error)
 	AnalyzeCurrentDeltaFn     func(ctx context.Context, req *agent.AnalyzeCurrentDeltaBatchRequest) (*agent.AnalyzeCurrentDeltaBatchResult, error)
@@ -27,6 +26,13 @@ type MockAgent struct {
 	AnalyzeWorkspaceSpecFn    func(ctx context.Context, req *agent.AnalyzeWorkspaceSpecRequest) (*domain.WorkspaceSpec, error)
 	OptimizeWorkflowFn        func(ctx context.Context, req *agent.OptimizeWorkflowRequest) (*agent.OptimizeContentResult, error)
 	OptimizeRuleFn            func(ctx context.Context, req *agent.OptimizeRuleRequest) (*agent.OptimizeContentResult, error)
+}
+
+func (m *MockAgent) ScreenSemanticGaps(ctx context.Context, req *agent.SemanticScreenRequest) (*agent.SemanticScreenResult, error) {
+	if m.ScreenSemanticGapsFn != nil {
+		return m.ScreenSemanticGapsFn(ctx, req)
+	}
+	return &agent.SemanticScreenResult{Skip: []agent.SemanticScreenDecision{}}, nil
 }
 
 // OptimizeWorkflow 模拟工作流正文优化。
@@ -122,26 +128,6 @@ func (m *MockAgent) ReviewAuthority(ctx context.Context, req *agent.ReviewAuthor
 	return &req.Candidate, nil
 }
 
-// PlanLearningAgenda 模拟源码证据学习议程规划。
-func (m *MockAgent) PlanLearningAgenda(ctx context.Context, req *agent.PlanLearningAgendaRequest) (*agent.PlanLearningAgendaResult, error) {
-	if m.PlanLearningAgendaFn != nil {
-		return m.PlanLearningAgendaFn(ctx, req)
-	}
-	if len(req.FocusPaths) == 0 {
-		return &agent.PlanLearningAgendaResult{}, nil
-	}
-	return &agent.PlanLearningAgendaResult{
-		Focuses: []domain.EvidenceFocus{{
-			ID:            "mock-learning-focus",
-			Name:          i18n.Get("LearnCurrentFallbackFocusName"),
-			AnalysisDepth: domain.EvidenceFocusDepthStandard,
-			EntryPaths:    append([]string(nil), req.FocusPaths...),
-			ScopeReason:   i18n.Get("LearnCurrentFallbackFocusReason"),
-		}},
-		Reason: "Mock keeps all requested learning inputs.",
-	}, nil
-}
-
 // AnalyzeCurrentCodebase 模拟当前代码库分析
 func (m *MockAgent) AnalyzeCurrentCodebase(ctx context.Context, req *agent.AnalyzeCurrentCodebaseRequest) (*agent.AnalyzeCurrentCodebaseResult, error) {
 	if m.AnalyzeCurrentCodebaseFn != nil {
@@ -178,7 +164,6 @@ func (m *MockAgent) AnalyzeCurrentFocusBatch(ctx context.Context, req *agent.Ana
 				EvidenceFocus:   focus.EvidenceFocus,
 				FocusPaths:      focus.FocusPaths,
 				ContextFiles:    focus.SampleFiles,
-				DiffFiles:       focus.DiffFiles,
 				RelatedPatterns: focus.RelatedPatterns,
 			})
 		}
@@ -212,7 +197,6 @@ func (m *MockAgent) AnalyzeCurrentFocusBatch(ctx context.Context, req *agent.Ana
 			EvidenceFocus: focus.EvidenceFocus,
 			FocusPaths:    focus.FocusPaths,
 			SampleFiles:   focus.SampleFiles,
-			DiffFiles:     focus.DiffFiles,
 		})
 	}
 	result, err := m.AnalyzeCurrentCodebaseBatch(ctx, fullReq)
@@ -248,7 +232,6 @@ func (m *MockAgent) AnalyzeCurrentCodebaseBatch(ctx context.Context, req *agent.
 				StructuralContext: req.StructuralContext,
 				MainFiles:         req.MainFiles,
 				SampleFiles:       unit.SampleFiles,
-				DiffFiles:         unit.DiffFiles,
 				UserContext:       req.UserContext,
 				UserContextPath:   req.UserContextPath,
 				LearningMode:      req.LearningMode,
@@ -298,7 +281,6 @@ func (m *MockAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.Ana
 				EvidenceFocus: unit.EvidenceFocus,
 				FocusPaths:    unit.FocusPaths,
 				SampleFiles:   unit.ContextFiles,
-				DiffFiles:     unit.DiffFiles,
 			})
 		}
 		result, err := m.AnalyzeCurrentBatchFn(ctx, batchReq)
@@ -319,7 +301,6 @@ func (m *MockAgent) AnalyzeCurrentDeltaBatch(ctx context.Context, req *agent.Ana
 				FocusPaths:      unit.FocusPaths,
 				Structure:       req.Structure,
 				StructurePath:   req.StructurePath,
-				DiffFiles:       unit.DiffFiles,
 				SampleFiles:     unit.ContextFiles,
 				UserContext:     req.UserContext,
 				UserContextPath: req.UserContextPath,

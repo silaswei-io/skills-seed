@@ -53,8 +53,8 @@ func ValidateContractResult(contract string, opts aicontract.StructuredOutputOpt
 	case aicontract.ContractAnalyzeCurrentDeltaBatch:
 		_, err := ParseAnalyzeCurrentDeltaBatchResult(output)
 		return err
-	case aicontract.ContractPlanLearningAgenda:
-		_, err := ParsePlanLearningAgendaResult(output)
+	case aicontract.ContractSemanticScreen:
+		_, err := ParseSemanticScreenResult(output)
 		return err
 	case aicontract.ContractReviewKnowledge:
 		result, err := ParseReviewKnowledgeResult(output)

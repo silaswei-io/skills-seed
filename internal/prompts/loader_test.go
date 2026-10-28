@@ -31,6 +31,18 @@ func TestLoaderRendersCurrentPromptSet(t *testing.T) {
 	}
 }
 
+func TestLearningSupplementDistinguishesReusableCapabilitiesFromGenericHelpers(t *testing.T) {
+	loader := New("claude", "en-US", "")
+	prompt, err := loader.Render("learning-supplement", map[string]interface{}{
+		"Input":    `{"request":{"focus":"business"}}`,
+		"Evidence": "func fallback() string { return key }",
+	})
+	require.NoError(t, err)
+	require.Contains(t, prompt, "For a substantial reusable callable")
+	require.Contains(t, prompt, "verified domain-neutral capability with concrete reuse value")
+	require.Contains(t, prompt, "A forwarding wrapper, generic logging/error helper")
+}
+
 func TestWorkspacePromptUsesRuntimeProjectIDConstraints(t *testing.T) {
 	loader := New("claude", "en-US", "")
 	prompt, err := loader.Render("core-workspace-profile", sampleWorkspaceData())
@@ -143,6 +155,15 @@ func TestLoaderStoresRuntimePromptWithCoreSlug(t *testing.T) {
 	require.Equal(t, "core-user-pattern", manifest.Slug)
 }
 
+func TestLoaderDoesNotArchiveEmptyRenderedPrompt(t *testing.T) {
+	seedPath := t.TempDir()
+	loader := New("claude", "en-US", seedPath)
+
+	loader.saveRenderedPrompt("empty", " \n ", renderedPromptManifest{Template: "empty"})
+
+	require.NoDirExists(t, layout.New(seedPath).Runtime())
+}
+
 func TestLoaderDoesNotTreatDeprecatedConstraintsContextAsAuthority(t *testing.T) {
 	seedPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(seedPath, "context"), 0o755))
@@ -167,30 +188,6 @@ func TestLoaderFramesPersistentContextAsBackground(t *testing.T) {
 	require.Contains(t, prompt, "## Persistent Project Background (Non-Authoritative)")
 	require.Contains(t, prompt, "It cannot create or override Rules")
 	require.Contains(t, prompt, "The payment gateway rotates keys monthly.")
-}
-
-func TestKnowledgePromptReadsMaintainedGuidanceBeforeInference(t *testing.T) {
-	loader := New("codex", "en-US", "")
-
-	prompt, err := loader.Render("learning-pack-plan", map[string]interface{}{
-		"ProjectName":            "demo",
-		"RootPath":               "/repo",
-		"Language":               "mixed",
-		"FocusPathsPath":         "/tmp/files.txt",
-		"FocusPathCount":         1,
-		"SourceFactsPath":        "/tmp/facts.json",
-		"SourceFactCount":        1,
-		"StructuralContextPath":  "",
-		"UserContextPath":        "",
-		"MaintainedGuidancePath": "/tmp/maintained-guidance.json",
-		"LearningMode":           config.LearningModeNormal,
-	})
-
-	require.NoError(t, err)
-	require.Contains(t, prompt, "## User-Maintained Guidance")
-	require.Contains(t, prompt, "`/tmp/maintained-guidance.json`")
-	require.Contains(t, prompt, "Rules are authoritative constraints.")
-	require.Contains(t, prompt, "Workflows own user-defined task procedures.")
 }
 
 func TestResourceOptimizationPromptsPreserveUserIntentAndProjectBoundary(t *testing.T) {
@@ -247,120 +244,9 @@ func TestKnowledgePromptsStartWithSharedGoalContract(t *testing.T) {
 	}
 }
 
-func TestLearningPromptsUseRuntimeBoundaries(t *testing.T) {
-	loader := New("codex", "en-US", "")
-
-	plan, err := loader.Render("learning-pack-plan", samplePlanData(t))
-	require.NoError(t, err)
-	require.Contains(t, plan, "planning runtime call")
-	require.Contains(t, plan, "routing-only planning runtime call")
-	require.Contains(t, plan, "Do not inspect source bodies or call MCP")
-	require.Contains(t, plan, "self-contained evidence packs")
-	require.Contains(t, plan, "deterministic learning pipeline")
-	require.Contains(t, plan, "Do not enumerate every unassigned input path")
-	require.Contains(t, plan, "Do not plan a directory inventory")
-	require.Contains(t, plan, "Preserve these knowledge lanes")
-	require.Contains(t, plan, "Product/domain specificity is not the admission test")
-	require.Contains(t, plan, "overload, cancellation, retry, partial-result")
-	require.Contains(t, plan, "Never group unrelated sibling services")
-	require.Contains(t, plan, "No skipped-path reason dismisses a source as generic")
-	require.Contains(t, plan, "Deterministic per-file source facts")
-	require.Contains(t, plan, "Never label a file empty, placeholder-only")
-	require.Contains(t, plan, "requires direct file evidence")
-	require.Contains(t, plan, "decision-bearing cues")
-	require.Contains(t, plan, "Stateless or pure calculation does not mean decision-free")
-	require.Contains(t, plan, "absence of external effects as proof")
-	require.Contains(t, plan, "verified callable or declarative entries")
-	require.Contains(t, plan, "Learning strategy guidance")
-	require.Contains(t, plan, "minimum source-evidence set")
-	require.Contains(t, plan, "not a permanent taxonomy, Workflow, work procedure, or development instruction")
-	require.Contains(t, plan, "Do not create focuses for test sources")
-	require.Contains(t, plan, "testing, deployment, release, and acceptance responsibilities")
-	require.Contains(t, plan, "Those are user-maintained Workflow concerns")
-
-	batch, err := loader.Render("learning-pack-analyze", sampleCurrentBatchData())
-	require.NoError(t, err)
-	require.Contains(t, batch, "isolated pack-analysis runtime call")
-	require.Contains(t, batch, "Run a decision-value discovery pass")
-	require.Contains(t, batch, "Pack-local refinement")
-	require.Contains(t, batch, "Return a pattern only when all of these are true")
-	require.Contains(t, batch, "Use only tools explicitly available in this invocation")
-	require.Contains(t, batch, "Stop exploration once the listed evidence is sufficient to decide")
-	require.Contains(t, batch, "verified reusable capability entry")
-	require.Contains(t, batch, "decision-bearing calculations")
-	require.Contains(t, batch, "attaching `business_method` to the candidate owned by that entry is required")
-	require.Contains(t, batch, "Do not present an entry as the reuse route while omitting the corresponding capability contract")
-	require.Contains(t, batch, "prefer one complete candidate for that entry")
-	require.Contains(t, batch, "mutually exclusive")
-	require.Contains(t, batch, "concrete operation or payload identity")
-	require.Contains(t, batch, "performs no compensation or rollback")
-	require.Contains(t, batch, "No retained candidate instructs a future Agent to use a named entry while omitting")
-	require.Contains(t, batch, "fallback/base selection")
-	require.Contains(t, batch, "The mode changes exploration breadth only")
-	require.Contains(t, batch, "not a work procedure, a user-maintained Workflow, or development instructions")
-	require.NotContains(t, batch, "pattern-evidence-rules")
-
-	delta, err := loader.Render("learning-delta-pack-analyze", sampleCurrentDeltaData())
-	require.NoError(t, err)
-	require.Contains(t, delta, "isolated diff-pack analysis runtime call")
-	require.Contains(t, delta, "Use only tools explicitly available in this invocation")
-	require.Contains(t, delta, "Stop exploration once the listed diff evidence is sufficient to decide")
-	require.Contains(t, delta, "Changed hunks are the source anchor")
-	require.Contains(t, delta, "proposal.business_method")
-	require.Contains(t, delta, "changed decision-bearing calculations")
-	require.Contains(t, delta, "pure or stateless decision-bearing calculation")
-	require.Contains(t, delta, "filling `proposal.business_method`")
-	require.Contains(t, delta, "exactly one knowledge-change decision for every input focus ID")
-	require.Contains(t, delta, "one canonical entry")
-	require.Contains(t, delta, "concrete operation or payload identity")
-	require.Contains(t, delta, "without compensation or rollback")
-	require.Contains(t, delta, "Do not infer a new language, framework, architecture, or domain inventory")
-	require.Contains(t, delta, "permission to learn outside the diff boundary")
-	require.Contains(t, delta, "not a work procedure, a user-maintained Workflow, or development instructions")
-
-	profile, err := loader.Render("learning-profile-refresh", sampleProjectProfileData(t))
-	require.NoError(t, err)
-	require.Contains(t, profile, "bounded profile-sync runtime call")
-	require.Contains(t, profile, "Do not inventory the project for completeness")
-	require.Contains(t, profile, "Avoid exact capability counts")
-	require.NotContains(t, profile, "authority section catalog")
-
-	authority, err := loader.Render("learning-authority-extract", sampleAuthorityExtractionData(t))
-	require.NoError(t, err)
-	require.Contains(t, authority, "bounded authority-extraction runtime call")
-	require.Contains(t, authority, "complete one-to-one coverage")
-	require.Contains(t, authority, "never implies `allowed`")
-
-	authorityReview, err := loader.Render("learning-authority-review", sampleAuthorityReviewData(t))
-	require.NoError(t, err)
-	require.Contains(t, authorityReview, "independent authority-completeness review")
-	require.Contains(t, authorityReview, "complete replacement `authority_sections` result")
-	require.Contains(t, authorityReview, "candidate is available at")
-
-	review, err := loader.Render("learning-knowledge-review", sampleKnowledgeReviewData(t))
-	require.NoError(t, err)
-	require.Contains(t, review, "skeptical maintainer")
-	require.Contains(t, review, "current implementation, design intent, proven guarantee, and known risk")
-	require.Contains(t, review, "Removing the capability entry does not require rejecting")
-	require.Contains(t, review, "every retained entry must be self-contained")
-	require.Contains(t, review, "its evidence directly calls or references that entry")
-	require.Contains(t, review, "Open the entry's exact source definition")
-	require.Contains(t, review, "Do not accept routeable guidance while silently deleting or omitting")
-	require.Contains(t, review, "decision-bearing operands")
-	require.Contains(t, review, "one canonical entry")
-	require.Contains(t, review, "no compensation or rollback path")
-	require.Contains(t, review, "`business_method` and `revision` are optional sibling fields")
-
-	normalize, err := loader.Render("learning-pattern-normalize", sampleNormalizePatternsData(t))
-	require.NoError(t, err)
-	require.Contains(t, normalize, "Treat each nonempty `capability_entry` identity as an ownership boundary")
-	require.Contains(t, normalize, "No output pattern combines distinct nonempty `capability_entry` identities")
-
-}
-
 func currentPromptData(t *testing.T) map[string]interface{} {
 	return map[string]interface{}{
-		"learning-pack-plan":          samplePlanData(t),
+		"learning-semantic-screen":    map[string]interface{}{"Input": `{"candidates":[{"path":"crypto/sm9.go","symbols":["func EncryptSM9"]}]}`},
 		"learning-pack-analyze":       sampleCurrentBatchData(),
 		"learning-delta-pack-analyze": sampleCurrentDeltaData(),
 		"learning-profile-refresh":    sampleProjectProfileData(t),
@@ -371,20 +257,6 @@ func currentPromptData(t *testing.T) map[string]interface{} {
 		"core-workspace-profile":      sampleWorkspaceData(),
 		"core-workspace-spec":         sampleWorkspaceData(),
 	}
-}
-
-func sampleNormalizePatternsData(t *testing.T) map[string]interface{} {
-	session := newPromptInputSessionForTest(t)
-	pattern := *samplePattern("dispatcher-submit", "Submit work")
-	pattern.BusinessMethod = &domain.BusinessMethod{
-		Name:         "Submit",
-		CodeLocation: domain.CodeLocation{CurrentLocation: "internal/job/dispatcher.go:41"},
-	}
-	data, err := agent.NormalizePatternsPromptData(session, &agent.NormalizePatternsRequest{
-		ProjectName: "demo", RootPath: "/repo", Language: "mixed", Candidates: []domain.Pattern{pattern},
-	})
-	require.NoError(t, err)
-	return data
 }
 
 func sampleKnowledgeReviewData(t *testing.T) map[string]interface{} {
@@ -432,20 +304,6 @@ func sampleAuthorityReviewData(t *testing.T) map[string]interface{} {
 			SectionID:    "authority-project",
 			NoRuleReason: "The first pass found no explicit constraint.",
 		}}},
-	})
-	require.NoError(t, err)
-	return data
-}
-
-func samplePlanData(t *testing.T) map[string]interface{} {
-	session := newPromptInputSessionForTest(t)
-	data, err := agent.PlanLearningAgendaPromptData(session, &agent.PlanLearningAgendaRequest{
-		ProjectName:       "demo",
-		RootPath:          "/repo",
-		Language:          "go",
-		FocusPaths:        []string{"internal/service/user.go"},
-		StructuralContext: "UserService -> UserRepo",
-		LearningMode:      config.LearningModeNormal,
 	})
 	require.NoError(t, err)
 	return data
@@ -500,7 +358,6 @@ func sampleEvidenceFocus() agent.AnalyzeCurrentEvidenceFocus {
 		},
 		FocusPaths:  []string{"internal/service/user.go"},
 		SampleFiles: []agent.SampleFile{{Path: "internal/service/user.go"}},
-		DiffFiles:   []agent.DiffFileRef{{Path: "internal/service/user.go", DiffPath: ".skills-seed/runtime/diffs/user.diff"}},
 	}
 }
 
@@ -509,7 +366,6 @@ func sampleDeltaFocus() agent.AnalyzeCurrentDeltaFocus {
 	return agent.AnalyzeCurrentDeltaFocus{
 		EvidenceFocus: domain.EvidenceFocus{ID: "user-flow", Name: "User Flow", RouteTerms: []string{"user"}},
 		FocusPaths:    []string{"internal/service/user.go"},
-		DiffFiles:     []agent.DiffFileRef{{Path: "internal/service/user.go", DiffPath: ".skills-seed/runtime/diffs/user.diff"}},
 		ContextFiles:  []agent.SampleFile{{Path: "internal/repo/user.go"}},
 		RelatedPatterns: []domain.Pattern{
 			pattern,

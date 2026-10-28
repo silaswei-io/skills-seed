@@ -1,0 +1,21 @@
+# {{.Method.DisplayName}}
+
+- **当前位置**: `{{.Method.DisplayLocation}}`
+{{if .Method.LocationStatus}}- **位置状态**: `{{.Method.LocationStatus}}`
+{{end}}{{if .Method.HistoricalDisplayLocation}}- **历史位置**: `{{.Method.HistoricalDisplayLocation}}`
+{{end}}{{if .Method.Module}}- **归属模块**: `{{.Method.Module}}`
+{{end}}{{if .Method.Type}}- **类型**: {{.Method.Type}}
+{{end}}{{if .Method.Description}}- **功能**: {{.Method.Description}}
+{{end}}
+{{if .Method.Function}}**入口签名**
+
+```{{.CodeFenceLanguage}}
+{{.Method.Function}}
+```
+{{end}}
+{{if .Method.Prerequisites}}**前置条件**: {{.Method.Prerequisites}}
+{{end}}
+{{if .Method.Returns}}**返回值**: {{.Method.Returns}}
+{{end}}
+{{if .Method.Usage}}**使用场景**: {{.Method.Usage}}
+{{end}}

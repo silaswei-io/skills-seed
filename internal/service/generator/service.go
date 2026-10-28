@@ -10,12 +10,14 @@ import (
 
 	"github.com/silaswei-io/skills-seed/embedfs"
 	"github.com/silaswei-io/skills-seed/internal/agent"
+	"github.com/silaswei-io/skills-seed/internal/codegraph"
 	"github.com/silaswei-io/skills-seed/internal/domain"
 	"github.com/silaswei-io/skills-seed/internal/i18n"
 	"github.com/silaswei-io/skills-seed/internal/infra/config"
 	profilestore "github.com/silaswei-io/skills-seed/internal/infra/storage/profile"
 	"github.com/silaswei-io/skills-seed/internal/metadata"
 	"github.com/silaswei-io/skills-seed/internal/runtimecontext"
+	"github.com/silaswei-io/skills-seed/internal/service/navigation"
 	"github.com/silaswei-io/skills-seed/internal/service/skilloutput"
 	"github.com/silaswei-io/skills-seed/internal/skillgen"
 	"github.com/silaswei-io/skills-seed/internal/sourcecode"
@@ -26,6 +28,7 @@ import (
 
 // GeneratorService 生成服务
 type GeneratorService struct {
+	fileTracker    domain.FileAnalysisTracker
 	patternRepo    patternReader
 	profileRepo    profileReader
 	workflowRepo   domain.WorkflowRepository
@@ -40,6 +43,7 @@ type GeneratorService struct {
 // NewGeneratorService 创建生成服务
 func NewGeneratorService(
 	patternRepo patternReader,
+	fileTracker domain.FileAnalysisTracker,
 	profileRepo profileReader,
 	skillsLoader *skills.Loader,
 	configRepo config.Reader,
@@ -52,6 +56,7 @@ func NewGeneratorService(
 	}
 	return &GeneratorService{
 		patternRepo:    patternRepo,
+		fileTracker:    fileTracker,
 		profileRepo:    profileRepo,
 		workflowRepo:   workflowRepo,
 		ruleRepo:       ruleRepo,
@@ -158,6 +163,23 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 	projectRoot := stringx.FirstNonBlank(projectConfig.RootPath, runtimecontext.ProjectRoot(ctx))
 	manifestPath := generatedSkillsManifestPath(projectRoot, targetAgent)
 	manifestOutputPath := generatedSkillsOutputPath(projectRoot, resolvedOutputPath)
+	var navigationIndex *codegraph.Index
+	navigationHash := ""
+	if projectRoot != "" {
+		navigationIndex, _, err = navigation.Refresh(ctx, s.configRepo, projectRoot)
+		if err != nil {
+			return err
+		}
+		navigationHash, err = navigation.Hash(projectRoot)
+		if err != nil {
+			return err
+		}
+		profile, rankedPatterns, err = s.localKnowledge(ctx, projectRoot, profile, rankedPatterns)
+		if err != nil {
+			return err
+		}
+		resourceOnly = resourceOnly && len(navigationIndex.Files)+len(navigationIndex.Unindexed) == 0
+	}
 	snapshot := verifiedKnowledgeSnapshot{RenderProfile: profile}
 	if !resourceOnly {
 		var snapshotErr error
@@ -168,7 +190,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 	}
 	var summaryResult generationSummary
 	if err := runStep(i18n.Get("ProgressGenerateSummary"), func() error {
-		summaryResult = s.buildDeterministicSummary(snapshot.Patterns, patternInsights)
+		summaryResult = s.buildDeterministicSummary(snapshot.Patterns)
 		return nil
 	}); err != nil {
 		return err
@@ -189,6 +211,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 				ProgramVersion:      metadata.ProgramVersion,
 				SkillsTemplatesHash: templatesHash,
 				ResourceOnly:        resourceOnly,
+				Navigation:          navigationIndex,
 				WorkflowReferences:  workflowReferences,
 				RuleReferences:      ruleReferences,
 			})
@@ -209,6 +232,7 @@ func (s *GeneratorService) GenerateSkillsWithOptions(ctx context.Context, output
 			}
 			return skilloutput.WriteManifest(staging, manifestPath, skilloutput.Manifest{
 				KnowledgeSnapshotHash: knowledgeSnapshotHash(snapshot),
+				NavigationHash:        navigationHash,
 				ProgramVersion:        metadata.ProgramVersion,
 				TargetAgent:           targetAgent,
 				OutputPath:            manifestOutputPath,
@@ -284,7 +308,7 @@ func (s *GeneratorService) loadProjectProfileForGeneration(ctx context.Context, 
 	if err == nil {
 		return profile, false, nil
 	}
-	if len(workflowReferences) == 0 && len(ruleReferences) == 0 || !errors.Is(err, errProjectProfileMissing) {
+	if !errors.Is(err, errProjectProfileMissing) {
 		return nil, false, err
 	}
 	return s.fallbackProjectProfile(), true, nil
