@@ -20,11 +20,27 @@ type Config struct {
 	Project   ProjectConfig   `yaml:"profile"`
 	Workspace WorkspaceConfig `yaml:"workspace"`
 	Agent     AgentConfig     `yaml:"agent"`
+	CodeGraph CodeGraphConfig `yaml:"codegraph"`
 	Learning  LearningConfig  `yaml:"learning"`
 	Runtime   RuntimeConfig   `yaml:"runtime"`
 	Skills    SkillsConfig    `yaml:"skills"`
 	Logging   LoggingConfig   `yaml:"logging"`
 	Exclude   ExcludeConfig   `yaml:"exclude"` // 全局排除配置
+}
+
+// CodeGraphConfig 控制本地结构索引使用的 SDK 来源。
+type CodeGraphConfig struct {
+	Runtime string `yaml:"runtime"` // auto 优先外置后回退内置；external 和 embedded 只使用指定来源
+}
+
+// EffectiveRuntime 为旧配置提供默认选择。
+func (c CodeGraphConfig) EffectiveRuntime() string {
+	switch c.Runtime {
+	case "external", "embedded":
+		return c.Runtime
+	default:
+		return "auto"
+	}
 }
 
 // ProjectConfig 保存当前项目或工作区根的身份信息。
@@ -711,8 +727,9 @@ func (r *Repository) fallbackDefaultConfig(locale string) *Config {
 			AllowUserPlugins: false,
 			Parallelism:      0,
 		},
-		Learning: defaultLearningConfig(),
-		Runtime:  defaultRuntimeConfig(),
+		CodeGraph: CodeGraphConfig{Runtime: "auto"},
+		Learning:  defaultLearningConfig(),
+		Runtime:   defaultRuntimeConfig(),
 		Skills: SkillsConfig{
 			Target: "agent",
 			Locale: DefaultSkillsLocale,
@@ -735,6 +752,7 @@ type Reader interface {
 	GetProjectConfig() ProjectConfig
 	GetWorkspaceConfig() WorkspaceConfig
 	GetAgentConfig() AgentConfig
+	GetCodeGraphConfig() CodeGraphConfig
 	GetLearningConfig() LearningConfig
 	GetRuntimeConfig() RuntimeConfig
 	GetCurrentLearningConfig() CurrentLearningConfig
@@ -764,6 +782,11 @@ func (r *Repository) GetWorkspaceConfig() WorkspaceConfig {
 // GetAgentConfig 获取 Agent 配置
 func (r *Repository) GetAgentConfig() AgentConfig {
 	return r.config.Agent
+}
+
+// GetCodeGraphConfig 获取 CodeGraph 运行时选择。
+func (r *Repository) GetCodeGraphConfig() CodeGraphConfig {
+	return r.config.CodeGraph
 }
 
 // GetLearningConfig 获取学习配置

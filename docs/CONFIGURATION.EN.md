@@ -2,7 +2,7 @@
 
 ## Local scanning and focused semantic enrichment
 
-`learn current` and `sync` update a local structure index using bundled CodeGraph 1.6.2, without AI for structural scanning. Only important semantic gaps trigger automatic analysis and independent review; whole-repository AI agenda planning is skipped. Source builds must run `make bundle` first, or set `SKILLS_SEED_CODEGRAPH_HOME` to an official platform package. Release binaries extract the component into the user cache on first use; no global Node/npm or runtime download is required.
+`learn current` and `sync` update a local structure index. `codegraph.runtime: auto` prefers an installed external CodeGraph platform package and falls back to bundled 1.6.2; `external` and `embedded` force one source. Structural scanning uses no AI, while important semantic gaps still trigger analysis and independent review. Source builds must run `make bundle` first. `SKILLS_SEED_CODEGRAPH_HOME` selects an official platform package and takes precedence over config. The bundled component extracts into the user cache on first use without a runtime download.
 
 ```bash
 skills-seed sync
@@ -14,7 +14,7 @@ skills-seed generate skills
 
 Generated `references/code-navigation.md` links directories to source symbols and instructs development agents to search existing capabilities, inspect signatures and usage examples, then reuse, extend or justify a new component. Directories are structural navigation, not inferred business domains. `codegraph callers/callees/impact` take returned symbol IDs; `codegraph trace <from-id> <to-id>` finds static call paths. Dynamic and cross-service relationships may be incomplete; an empty result does not prove that no reusable capability exists.
 
-The index lives in the standard `.codegraph/` directory and is shared with other CodeGraph tools. Skills-seed adds its own `navigation.json` and lock file; a narrower scan does not recreate the shared database. Source selection follows repository exclusions and excludes generated Skills and caches. Files not indexed by the SDK are listed explicitly. Extraction failures return errors rather than claiming success.
+The index lives in the standard `.codegraph/` directory and is shared with other CodeGraph tools. Skills-seed adds its own `navigation.json` and lock file; a narrower scan does not recreate the shared database. Before opening the shared database, the selected runtime checks its schema version and refuses an incompatible index instead of migrating it implicitly. Source selection follows repository exclusions and excludes generated Skills and caches. Files not indexed by the SDK are listed explicitly. Extraction failures return errors rather than claiming success.
 
 Structural scans alone never advance semantic fingerprints. Only successfully analyzed, reviewed and stored supplements commit their scoped fingerprints; unfinished checkpoints remain available. Generation omits old Patterns whose source evidence fingerprints changed, retaining the original knowledge in storage. Project navigation is generated deterministically from the local index and saved knowledge; when source evidence changes, generation only stops projecting invalidated business patterns. Rule/Workflow maintenance is unchanged. Consuming agents must read applicable authority files directly.
 

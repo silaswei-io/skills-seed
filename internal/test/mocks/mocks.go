@@ -704,6 +704,7 @@ type MockConfigReader struct {
 	ProjectCfg   config.ProjectConfig
 	WorkspaceCfg config.WorkspaceConfig
 	AgentCfg     config.AgentConfig
+	CodeGraphCfg config.CodeGraphConfig
 	LearningCfg  config.LearningConfig
 	RuntimeCfg   config.RuntimeConfig
 	SkillsCfg    config.SkillsConfig
@@ -720,6 +721,9 @@ func (m *MockConfigReader) GetWorkspaceConfig() config.WorkspaceConfig { return 
 
 // GetAgentConfig 模拟获取 Agent 配置
 func (m *MockConfigReader) GetAgentConfig() config.AgentConfig { return m.AgentCfg }
+
+// GetCodeGraphConfig 模拟获取 CodeGraph 运行时配置。
+func (m *MockConfigReader) GetCodeGraphConfig() config.CodeGraphConfig { return m.CodeGraphCfg }
 
 // GetLearningConfig 模拟获取学习配置
 func (m *MockConfigReader) GetLearningConfig() config.LearningConfig { return m.LearningCfg }

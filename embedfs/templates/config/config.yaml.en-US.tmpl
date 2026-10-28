@@ -27,6 +27,13 @@ workspace:
   projects: []
 
 ########################################################################
+# CodeGraph runtime
+########################################################################
+codegraph:
+  # auto prefers an external platform package and falls back to bundled; external/embedded force one source
+  runtime: "auto"
+
+########################################################################
 # Agent
 # Controls the Agent engine and concurrency used by learning and generation
 ########################################################################

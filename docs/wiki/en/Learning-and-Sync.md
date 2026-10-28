@@ -2,7 +2,7 @@
 
 ## Local scanning and focused semantic enrichment
 
-Local CodeGraph structural scanning is the default. `learn current` and `sync` update a local structure index using bundled CodeGraph 1.6.2, without AI for structural scanning. Only important semantic gaps trigger automatic analysis and independent review; whole-repository AI agenda planning is skipped. Source builds must run `make bundle` first, or set `SKILLS_SEED_CODEGRAPH_HOME` to an official platform package. Release binaries extract the component into the user cache on first use; no global Node/npm or runtime download is required.
+Local CodeGraph structural scanning is the default. `codegraph.runtime: auto` prefers an installed external CodeGraph platform package and falls back to bundled 1.6.2; `external` and `embedded` force one source. Structural scanning uses no AI; important semantic gaps still trigger analysis and independent review. Source builds must run `make bundle` first. `SKILLS_SEED_CODEGRAPH_HOME` selects an official platform package and takes precedence over config. An incompatible shared `.codegraph` database schema stops the run before implicit migration.
 
 ```bash
 skills-seed sync

@@ -2,7 +2,7 @@
 
 ## 本地扫描与按需语义补充
 
-默认使用本地 CodeGraph 结构扫描。`learn current` 和 `sync` 使用随发行包内置的 CodeGraph 1.6.2 更新本地结构索引，结构扫描不调用 AI；程序只为重要语义缺口自动调用分析和独立审核，不再进行全仓 AI 议程规划。源码开发构建请先执行 `make bundle`；也可用 `SKILLS_SEED_CODEGRAPH_HOME` 指定官方平台包目录。发行二进制首次使用时解压组件到用户缓存，无需全局 Node/npm，也不在运行时下载组件。
+默认使用本地 CodeGraph 结构扫描。`codegraph.runtime: auto` 优先外置 CodeGraph 平台包，找不到时使用内置 1.6.2；`external` 和 `embedded` 可强制指定来源。结构扫描不调用 AI，重要语义缺口仍由 AI 分析和独立审核。源码构建请先执行 `make bundle`；`SKILLS_SEED_CODEGRAPH_HOME` 可指定官方平台包目录，优先于配置。内置组件首次使用时解压到用户缓存，不在运行时下载。
 
 ```bash
 skills-seed sync
@@ -14,7 +14,7 @@ skills-seed generate skills
 
 生成的 `references/code-navigation.md` 按目录链接到符号入口，并要求开发 Agent 先检索、核对签名与调用示例，再决定复用、扩展或新增。目录是结构导航，不是自动推断的业务域。`codegraph callers/callees/impact` 使用查询返回的符号 ID；`codegraph trace <from-id> <to-id>` 查询静态调用路径。动态调用与跨服务关系可能不完整，空结果不能证明没有现成能力。
 
-索引保存到标准 `.codegraph/`，与其他 CodeGraph 工具复用。skills-seed 只在该目录写入自己的 `navigation.json` 和锁文件；扫描按入选路径更新索引，不因范围收缩而重建共享数据库。源码选择沿用排除规则，缓存与生成 Skill 不参与反向学习。未被 SDK 索引的文件会显式列出。解析失败会报错，不冒充扫描成功。
+索引保存到标准 `.codegraph/`，与其他 CodeGraph 工具复用。skills-seed 只在该目录写入自己的 `navigation.json` 和锁文件；扫描按入选路径更新索引，不因范围收缩而重建共享数据库。切换运行时前会校验共享数据库的 schema 版本；不兼容时停止，提示用选定的 CodeGraph 版本重建索引，避免隐式迁移。源码选择沿用排除规则，缓存与生成 Skill 不参与反向学习。未被 SDK 索引的文件会显式列出。解析失败会报错，不冒充扫描成功。
 
 本地结构扫描本身不更新语义学习指纹；只有自动补充完成分析、审核和入库后，才提交该范围的语义指纹。未完成的检查点保留。生成时，源码证据指纹变化的旧 Pattern 暂不投影；原知识仍保留。项目导航由本地索引和已保存知识确定性生成；源码证据变化时只停止投影失效的旧业务 Pattern。Rule/Workflow 保持原有维护方式，权威文件应由消费 Skill 的 Agent 按实际路径直接阅读。
 

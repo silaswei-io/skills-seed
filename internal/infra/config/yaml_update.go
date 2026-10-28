@@ -27,6 +27,7 @@ func applyConfigNodeValues(root *yaml.Node, cfg *Config) {
 	}
 
 	setYAMLWorkspaceConfig(doc, cfg.Workspace)
+	setYAMLString(doc, []string{"codegraph", "runtime"}, cfg.CodeGraph.EffectiveRuntime())
 
 	setYAMLString(doc, []string{"learning", "current", "mode"}, string(cfg.Learning.Current.Mode))
 	removeYAMLMappingKeys(doc, []string{"learning", "current"}, "local", "scope", "budget", "max_focuses_per_call", "select_relevant_files", "select_relevant_files_min_candidates")

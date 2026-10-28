@@ -1,12 +1,27 @@
-// 仅调用官方公开 SDK。一次进程打开一次索引，不启动服务或调用模型。
+// 通过官方 SDK 扫描与查询；打开索引前读取同版本 schema 常量，避免隐式迁移。
 const fs = require('node:fs');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const { CodeGraph, setLogger, silentLogger } = require(path.join(process.argv[2], 'lib/dist/index.js'));
+const { CURRENT_SCHEMA_VERSION } = require(path.join(process.argv[2], 'lib/dist/db/migrations.js'));
 setLogger(silentLogger);
+
+function checkSchema(root) {
+  const database = path.join(root, '.codegraph', 'codegraph.db');
+  if (!fs.existsSync(database)) return;
+  const db = new DatabaseSync(database, {readOnly:true});
+  try {
+    const row = db.prepare('SELECT MAX(version) AS version FROM schema_versions').get();
+    if (row.version !== CURRENT_SCHEMA_VERSION) {
+      throw new Error(`CodeGraph index schema ${row.version} differs from selected runtime schema ${CURRENT_SCHEMA_VERSION}; rebuild the shared index with the selected CodeGraph version before running skills-seed`);
+    }
+  } finally { db.close(); }
+}
 
 async function main() {
   const request = JSON.parse(fs.readFileSync(0, 'utf8'));
   const root = process.cwd();
+  checkSchema(root);
   let graph;
   try {
     if (request.action === 'scan') {

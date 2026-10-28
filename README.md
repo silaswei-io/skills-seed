@@ -15,7 +15,7 @@
 
 </div>
 
-默认 `sync` / `learn current` 先用内置 CodeGraph 本地扫描，再根据已变更的知识证据和真实调用图选择语义入口；同一调用链的下游能力由本地导航索引，不逐文件重复分析。多个证据批次才会触发紧凑 AI 预筛选，排除明确无长期价值的候选；保留的问题按证据容量动态组批，完成源码分析和独立审核。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](docs/wiki/Learning-and-Sync.md)。
+默认 `sync` / `learn current` 先用 CodeGraph 本地扫描（优先外置，缺失时用内置版），再根据已变更的知识证据和真实调用图选择语义入口；同一调用链的下游能力由本地导航索引，不逐文件重复分析。多个证据批次才会触发紧凑 AI 预筛选，排除明确无长期价值的候选；保留的问题按证据容量动态组批，完成源码分析和独立审核。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](docs/wiki/Learning-and-Sync.md)。
 
 Skills Seed 面向已有代码库。它将用户维护的项目约束、当前源码和可验证的项目知识组织为本地 Skills，让 Claude Code、Codex 等 Agent 在改动前理解规则、模块归属、可复用能力和影响边界。
 

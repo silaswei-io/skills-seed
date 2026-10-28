@@ -2,7 +2,7 @@
 
 ## 本地扫描与按需语义补充
 
-默认使用本地 CodeGraph 结构扫描。`learn current` 和 `sync` 使用随发行包内置的 CodeGraph 1.6.2 更新本地结构索引，结构扫描不调用 AI；程序只为重要语义缺口自动调用分析和独立审核，不再进行全仓 AI 议程规划。源码开发构建请先执行 `make bundle`；也可用 `SKILLS_SEED_CODEGRAPH_HOME` 指定官方平台包目录。发行二进制首次使用时解压组件到用户缓存，无需全局 Node/npm，也不在运行时下载组件。
+默认使用本地 CodeGraph 结构扫描。`codegraph.runtime: auto` 优先外置 CodeGraph 平台包，找不到时使用内置 1.6.2；`external` 和 `embedded` 可强制指定。结构扫描不调用 AI，重要语义缺口仍由 AI 分析和独立审核。源码构建请先执行 `make bundle`；`SKILLS_SEED_CODEGRAPH_HOME` 可指定官方平台包目录，优先于配置。共享 `.codegraph` 数据库 schema 不兼容时会停止，避免隐式迁移。
 
 ```bash
 skills-seed sync

@@ -34,7 +34,7 @@ func Refresh(ctx context.Context, cfg config.Reader, root string) (*codegraph.In
 	if err != nil {
 		return nil, false, err
 	}
-	index, err := codegraph.Scan(ctx, root, selection.Paths())
+	index, err := codegraph.Scan(ctx, root, selection.Paths(), cfg.GetCodeGraphConfig().EffectiveRuntime())
 	if err != nil {
 		return nil, false, err
 	}

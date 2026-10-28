@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.21.1]
+
+### Improvements
+
+- Added `codegraph.runtime`: `auto` prefers an installed external CodeGraph platform package and falls back to the bundled runtime; `external` and `embedded` force one source. Scans and queries share the same selection logic.
+- Checks the shared `.codegraph` database schema before opening the SDK, refusing incompatible versions instead of migrating the index implicitly.
+
+### Tests and Documentation
+
+- Added runtime-selection and index-compatibility regressions; updated bilingual config templates, configuration references, and learning Wiki pages.
+
 ## [v0.21.0]
 
 ### Architecture Refactoring

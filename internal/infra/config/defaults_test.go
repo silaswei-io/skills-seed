@@ -24,6 +24,12 @@ func TestLocaleDefaultsAndNormalization(t *testing.T) {
 	require.False(t, IsSupportedLocale("fr-FR"))
 }
 
+func TestCodeGraphRuntimeDefault(t *testing.T) {
+	require.Equal(t, "auto", (CodeGraphConfig{}).EffectiveRuntime())
+	require.Equal(t, "external", (CodeGraphConfig{Runtime: "external"}).EffectiveRuntime())
+	require.Equal(t, "embedded", (CodeGraphConfig{Runtime: "embedded"}).EffectiveRuntime())
+}
+
 func TestDefaultSkillsPathForTarget(t *testing.T) {
 	require.Equal(t, ".claude/skills/skills-seed-skills", DefaultSkillsPathForTarget("claude"))
 	require.Equal(t, ".agents/skills/skills-seed-skills", DefaultSkillsPathForTarget("codex"))

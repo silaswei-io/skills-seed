@@ -1,6 +1,6 @@
 # Workspace
 
-默认 `sync` / `learn current` 先用内置 CodeGraph 本地扫描，再按已有知识证据变化和本地调用关系选择关键语义缺口。候选按重要性顺序和证据容量动态组批，沿用独立审核和检查点恢复。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](Learning-and-Sync.md)。
+默认 `sync` / `learn current` 先用 CodeGraph 本地扫描（优先外置，缺失时用内置版），再按已有知识证据变化和本地调用关系选择关键语义缺口。候选按重要性顺序和证据容量动态组批，沿用独立审核和检查点恢复。AI 不可用时仍可生成本地导航，并明确记录待补充项。也可用 `learn current --semantic --focus <path>` 主动深挖。详见[学习与同步](Learning-and-Sync.md)。
 
 Workspace 模式适用于一个根目录下管理多个独立 Git 子项目的情况。它不把所有代码混成一个项目，而是保留事实归属：子项目学习自己的代码，根目录负责路由、共享约束和跨项目影响关系。
 

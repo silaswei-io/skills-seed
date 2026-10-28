@@ -37,7 +37,7 @@ func Cmd(cont *container.Container) *cobra.Command {
 			if _, _, err := navigation.Refresh(cmd.Context(), cont.ConfigRepo, root); err != nil {
 				return err
 			}
-			result, err := graph.Query(cmd.Context(), root, action, args)
+			result, err := graph.Query(cmd.Context(), root, action, args, cont.ConfigRepo.GetCodeGraphConfig().EffectiveRuntime())
 			if err != nil {
 				return err
 			}

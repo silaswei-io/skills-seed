@@ -152,6 +152,19 @@ func TestRepository_GetProjectConfig(t *testing.T) {
 	assert.NotEmpty(t, projectCfg.InitializedAt)
 }
 
+func TestRepository_CodeGraphRuntime(t *testing.T) {
+	seedPath := t.TempDir()
+	repo, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "auto", repo.GetCodeGraphConfig().EffectiveRuntime())
+	cfg := repo.Get()
+	cfg.CodeGraph.Runtime = "external"
+	require.NoError(t, repo.Update(cfg))
+	reloaded, err := NewRepository(seedPath, "zh-CN")
+	require.NoError(t, err)
+	require.Equal(t, "external", reloaded.GetCodeGraphConfig().EffectiveRuntime())
+}
+
 func TestRepository_EffectiveGetterDefaults(t *testing.T) {
 	repo := setupTestConfig(t)
 

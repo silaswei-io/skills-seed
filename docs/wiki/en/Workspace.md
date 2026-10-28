@@ -1,6 +1,6 @@
 # Workspace
 
-By default, `sync` / `learn current` scan locally with bundled CodeGraph, then select important semantic gaps using changed knowledge evidence and local call relationships. Candidates are dynamically batched by priority and evidence capacity, with independent review and checkpoints. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](Learning-and-Sync.md).
+By default, `sync` / `learn current` scan locally with CodeGraph (external first, bundled fallback), then select important semantic gaps using changed knowledge evidence and local call relationships. Candidates are dynamically batched by priority and evidence capacity, with independent review and checkpoints. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](Learning-and-Sync.md).
 
 Workspace mode is for a root directory containing multiple independent Git projects. It preserves ownership rather than merging all code into one project: children learn their own source, while the root routes work, captures shared constraints, and describes cross-project impact.
 

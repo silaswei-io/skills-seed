@@ -2,6 +2,17 @@
 
 [简体中文](CHANGELOG.md) | [English](CHANGELOG.en.md)
 
+## [v0.21.1]
+
+### 优化
+
+- 新增 `codegraph.runtime` 配置：`auto` 优先使用本机外置 CodeGraph 平台包，缺失时回退发行包内置版；`external` 和 `embedded` 可强制选择来源。扫描和查询共用同一选择逻辑。
+- 共享 `.codegraph` 数据库在 SDK 打开前校验 schema 版本，不兼容时停止并提示重建，避免不同 CodeGraph 版本隐式迁移索引。
+
+### 测试与文档
+
+- 增加运行时选择和索引兼容性回归测试；更新中英文配置模板、配置说明和学习 Wiki。
+
 ## [v0.21.0]
 
 ### 架构重构

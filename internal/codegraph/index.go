@@ -59,8 +59,8 @@ type Index struct {
 }
 
 // Scan 在独立索引中同步精确路径集合，整个请求只打开一次 SDK。
-func Scan(ctx context.Context, root string, paths []string) (*Index, error) {
-	data, err := invoke(ctx, root, map[string]any{"action": "scan", "paths": paths})
+func Scan(ctx context.Context, root string, paths []string, runtime string) (*Index, error) {
+	data, err := invoke(ctx, root, map[string]any{"action": "scan", "paths": paths}, runtime)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +83,12 @@ func normalizeGoExports(index *Index) {
 }
 
 // Query 只读查询已扫描结构；调用方负责在查询前更新本地索引。
-func Query(ctx context.Context, root, action string, args []string) (json.RawMessage, error) {
-	return invoke(ctx, root, map[string]any{"action": action, "args": args})
+func Query(ctx context.Context, root, action string, args []string, runtime string) (json.RawMessage, error) {
+	return invoke(ctx, root, map[string]any{"action": action, "args": args}, runtime)
 }
 
-func invoke(ctx context.Context, root string, request any) ([]byte, error) {
-	home, err := runtimeHome(ctx)
+func invoke(ctx context.Context, root string, request any, selection string) ([]byte, error) {
+	home, err := runtimeHome(ctx, selection)
 	if err != nil {
 		return nil, err
 	}

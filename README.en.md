@@ -15,7 +15,7 @@
 
 </div>
 
-By default, `sync` / `learn current` scan locally with bundled CodeGraph, then select semantic entries from changed knowledge evidence and real call paths. Downstream capabilities on the same call chain remain in local navigation instead of triggering repeated per-file analysis. Only when multiple evidence batches are needed does a compact AI pre-screen exclude clearly low-value candidates; remaining questions receive source analysis and independent review in dynamic batches. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](docs/wiki/en/Learning-and-Sync.md).
+By default, `sync` / `learn current` scan locally with CodeGraph (external first, bundled fallback), then select semantic entries from changed knowledge evidence and real call paths. Downstream capabilities on the same call chain remain in local navigation instead of triggering repeated per-file analysis. Only when multiple evidence batches are needed does a compact AI pre-screen exclude clearly low-value candidates; remaining questions receive source analysis and independent review in dynamic batches. When AI is unavailable, navigation remains usable and pending gaps are recorded. Use `learn current --semantic --focus <path>` for explicit deeper analysis. See [Learning and Sync](docs/wiki/en/Learning-and-Sync.md).
 
 Skills Seed is for existing repositories. It turns user-maintained project constraints, current source, and verifiable project knowledge into local Skills, so Claude Code, Codex, and similar Agents understand rules, ownership, reusable capabilities, and impact boundaries before editing.
 
