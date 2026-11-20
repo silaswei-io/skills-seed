@@ -20,6 +20,8 @@ type LearningSupplement struct {
 	SourceHashes map[string]string // 本轮实际提供的源码摘要，用于证据有效性判断。
 	SourceRanges map[string][]SourceRange
 	Symbols      map[string][]SupplementSymbol // CodeGraph 已确认的可调用入口。
+	Partial      bool                          // 仅完成文件的部分语义责任，全部分片成功前不能推进文件基线。
+	PatternIDs   []string                      // 非 nil 时仅复核这些已保存知识；空切片表示只分析当前符号。
 }
 
 type SupplementSymbol struct {

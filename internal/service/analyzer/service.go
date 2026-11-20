@@ -397,7 +397,7 @@ func (s *AnalyzerService) AnalyzeCurrentCodebaseBatch(ctx context.Context, proje
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 	if agent.CurrentLearningSupplement(ctx) != nil && result != nil && result.Assessment != "resolved" {
-		return nil, agent.ErrSupplementUnresolved
+		return nil, fmt.Errorf("source analysis returned assessment %q: %w", result.Assessment, agent.ErrSupplementUnresolved)
 	}
 	if err := agent.RequireResult(result, "AnalyzeCurrentCodebaseBatch"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)

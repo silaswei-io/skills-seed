@@ -40,6 +40,20 @@ Even after CLI success, Skills Seed validates the dynamic JSON Schema and busine
 
 Runtime archives are diagnostic evidence, not a manual knowledge-editing surface. When fixing prompts or structured contracts in Skills Seed itself, retain the original archive as a regression case.
 
+## Handling Yellow Pending-Assessment Warnings
+
+“Business learning is unfinished” means some candidates have not completed evidence analysis or review. A generated Skill does not imply coverage of those files. Open the reported `runtime/local-supplement.json` and inspect each `pending[].failure.stage`, `pending[].failure.reason`, and `blocked` entry. For older state without per-item failures, run `sync` once after upgrading to refresh diagnostics.
+
+| Cause | Responsibility and action |
+|---|---|
+| Source changes moved an old anchor beyond the current file | The tool automatically reviews the full current file when it fits; run `sync` after upgrading without editing stored line numbers |
+| Whole-file evidence exceeds capacity | The tool splits at saved-knowledge and complete-symbol boundaries; upgrading automatically retries old capacity blocks |
+| One pattern or complete symbol remains oversized, an index range is invalid, or an input contract fails | Improve the tool or correct input scope; retain pending state and diagnostics rather than deleting them |
+| Agent availability, authentication, or invocation fails | Correct the local Agent configuration, authentication, or network, then run `sync` to reuse valid checkpoints |
+| Business intent is missing, explicit rules conflict, or required external material is inaccessible | A responsible person must clarify intent or provide material/access; maintain durable facts in Context, Rules, or Workflows |
+
+Do not run `reset all`, clear the knowledge database, or edit generated output merely to remove warnings. Evidence assembly failures are not a request for users to invent business conclusions manually.
+
 ## Poor Persisted Pattern Quality
 
 Learning success does not mean every pattern belongs in durable knowledge. These cases do not require rerunning all learning:

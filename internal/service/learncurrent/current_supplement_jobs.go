@@ -14,6 +14,7 @@ import (
 type supplementJob struct {
 	number int
 	input  *agent.LearningSupplement
+	parts  []*agent.LearningSupplement
 }
 
 type supplementOutcome struct {
@@ -39,12 +40,37 @@ func runSupplementJobs(ctx context.Context, cont *container.Container, opts lear
 					outcomes <- supplementOutcome{job: job, err: err}
 					continue
 				}
-				result, err := runSupplementJob(ctx, cont, opts, job.input)
+				result, err := runSupplementParts(ctx, cont, opts, job)
 				outcomes <- supplementOutcome{job: job, result: result, err: err, started: true}
 			}
 		}()
 	}
 	return outcomes
+}
+
+// runSupplementParts 串行处理同一文件的分片，避免并发修改同一批已有知识。
+func runSupplementParts(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions, job supplementJob) (*learnCurrentProjectResult, error) {
+	if len(job.parts) == 0 {
+		return runSupplementJob(ctx, cont, opts, job.input)
+	}
+	result := &learnCurrentProjectResult{skipped: true}
+	for _, input := range job.parts {
+		part, err := runSupplementJob(ctx, cont, opts, input)
+		if err != nil {
+			return result, fmt.Errorf("evidence part %s: %w", input.Focus.ID, err)
+		}
+		result.patternsCount += part.patternsCount
+		result.savedCount += part.savedCount
+		result.retiredCount += part.retiredCount
+		result.droppedCount += part.droppedCount
+		result.dropped = append(result.dropped, part.dropped...)
+		result.skipped = result.skipped && part.skipped
+	}
+	return result, nil
+}
+
+func supplementStateScope(opts learnCurrentProjectOptions, input *agent.LearningSupplement) string {
+	return strings.Trim(opts.stateScope, "-") + "-" + input.Focus.ID
 }
 
 func runSupplementJob(ctx context.Context, cont *container.Container, opts learnCurrentProjectOptions, input *agent.LearningSupplement) (*learnCurrentProjectResult, error) {
@@ -57,7 +83,7 @@ func runSupplementJob(ctx context.Context, cont *container.Container, opts learn
 	semanticOpts.skipRuntimeCleanup = true
 	semanticOpts.userContext = fmt.Sprintf("%s\nLocal evidence revision: %x", opts.userContext, sha256.Sum256([]byte(input.Evidence)))
 	semanticOpts.focusPaths = input.Focus.EntryPaths
-	semanticOpts.stateScope = strings.Trim(opts.stateScope, "-") + "-" + input.Focus.ID
+	semanticOpts.stateScope = supplementStateScope(opts, input)
 	semanticOpts.showProgress = false
 	semanticOpts.showDetailedLogs = false
 	semanticOpts.onStepStart = nil

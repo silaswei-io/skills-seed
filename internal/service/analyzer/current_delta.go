@@ -80,7 +80,7 @@ func (s *AnalyzerService) AnalyzeCurrentDeltaBatch(ctx context.Context, projectR
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)
 	}
 	if agent.CurrentLearningSupplement(ctx) != nil && result != nil && result.Assessment != "resolved" {
-		return nil, agent.ErrSupplementUnresolved
+		return nil, fmt.Errorf("delta analysis returned assessment %q: %w", result.Assessment, agent.ErrSupplementUnresolved)
 	}
 	if err := agent.RequireResult(result, "AnalyzeCurrentDeltaBatch"); err != nil {
 		return nil, domain.NewDomainError(domain.ErrAIService, i18n.Get("AnalyzerAnalyzeCodebaseFailed"), err)

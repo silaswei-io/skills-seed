@@ -372,13 +372,20 @@ func TestSupplementCapacityBlockPersistsForUnchangedSource(t *testing.T) {
 }
 
 func TestSupplementInputHashTracksExistingKnowledge(t *testing.T) {
+	root := t.TempDir()
+	writeLearnFile(t, root, "flow.go", "package flow\nfunc Decide() {}\n")
 	index := &codegraph.Index{Nodes: []codegraph.Node{{ID: "decision", Path: "flow.go", Line: 2, EndLine: 4}}}
 	gap := semanticGap{Path: "flow.go", Symbols: []string{"decision"}, Existing: true}
 	pattern := admittedLearnCurrentPatternForTest("decision", "Decision", domain.CategoryBusiness, "flow.go")
 	pattern.EvidenceLocations[0].Line = 2
-	initial := supplementInputHash(index, gap, []domain.Pattern{*pattern})
+	initial := supplementInputHash(root, index, gap, []domain.Pattern{*pattern})
 	pattern.EvidenceLocations[0].Line = 3
-	require.NotEqual(t, initial, supplementInputHash(index, gap, []domain.Pattern{*pattern}))
+	require.NotEqual(t, initial, supplementInputHash(root, index, gap, []domain.Pattern{*pattern}))
+	pattern.EvidenceLocations = append(pattern.EvidenceLocations, domain.PatternEvidenceLocation{Path: "related.go"})
+	writeLearnFile(t, root, "related.go", "package flow\nfunc Related() {}\n")
+	initial = supplementInputHash(root, index, gap, []domain.Pattern{*pattern})
+	writeLearnFile(t, root, "related.go", "package flow\nfunc Related() { panic(\"changed\") }\n")
+	require.NotEqual(t, initial, supplementInputHash(root, index, gap, []domain.Pattern{*pattern}), "related source changes must invalidate a capacity block")
 }
 
 func TestLocalSupplementAutomaticReviewResumeAndUnchanged(t *testing.T) {

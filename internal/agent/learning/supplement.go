@@ -39,7 +39,7 @@ func supplementPromptData(ctx context.Context, request any) (map[string]interfac
 		return nil, err
 	}
 	if len(data)+len(evidence) > agent.SupplementInputLimit {
-		return nil, agent.ErrSupplementUnresolved
+		return nil, fmt.Errorf("supplement request and evidence: %d bytes exceeds %d-byte safety limit: %w", len(data)+len(evidence), agent.SupplementInputLimit, agent.ErrSupplementUnresolved)
 	}
 	return map[string]interface{}{"Input": string(data), "Evidence": evidence}, nil
 }

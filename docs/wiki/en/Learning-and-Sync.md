@@ -81,6 +81,12 @@ More parallelism does not reduce call count. The default path combines related e
 
 ## Success and Failure Boundaries
 
+Stored evidence line numbers are navigation hints rather than fixed code identities. When an old anchor lies beyond the current file, the tool supplies the complete current source if it fits, allowing analysis and independent review to verify or retire the old claim. It never clamps the anchor to the final line. If the full source still exceeds capacity, the candidate remains pending with its path, old anchor, current line count, and capacity reason.
+
+When whole-file evidence exceeds capacity, the tool splits by the complete evidence for one saved pattern or one complete callable entry, then combines those units dynamically by size. Parts belonging to one file run serially and review only the saved patterns explicitly assigned to them; independent files may still run concurrently. Reviewed writes and valid checkpoints survive failures, but the file's semantic baseline advances only after every part completes and all source digests still match. An indivisible unit that remains oversized keeps its capacity block rather than truncating evidence or claiming completion.
+
+Each `pending[].failure` in `.skills-seed/runtime/local-supplement.json` retains its own `stage` and `reason`: evidence assembly (`evidence`), Agent availability (`agent`), analysis and review (`learning`), or final commit (`commit`). `last_error` is only the last error summary; inspect each pending item when several warnings appear. Changes to related evidence contents or the evidence-selection policy automatically invalidate old capacity blocks for reassessment.
+
 When files remain pending assessment, sync reports the unfinished count even if a partial Skill was generated successfully. Pending files are not a count of proven business problems.
 
 A successful learning run does not prove all project code correct. It means the admitted knowledge passed source, scope, evidence, and structural checks. Generation consumes persisted results and does not make another Agent call.

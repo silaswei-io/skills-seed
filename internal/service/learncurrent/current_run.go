@@ -121,7 +121,7 @@ func (r *learnCurrentProjectRun) execute() (*learnCurrentProjectResult, error) {
 	if err := commandutil.MarkLearned(r.ctx, r.cont); err != nil {
 		return nil, err
 	}
-	if r.analysisState != nil {
+	if input := agent.CurrentLearningSupplement(r.ctx); r.analysisState != nil && (input == nil || !input.Partial) {
 		if err := r.stateRepo.Clear(); err != nil {
 			return nil, err
 		}

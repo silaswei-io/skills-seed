@@ -22,8 +22,11 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 		if input := agent.CurrentLearningSupplement(r.ctx); input != nil {
 			for path, expected := range input.SourceHashes {
 				actual, err := sourcecode.EvidenceDigest(r.projectRoot, path)
-				if err != nil || actual != expected {
-					return agent.ErrSupplementUnresolved
+				if err != nil {
+					return fmt.Errorf("read source evidence %s before knowledge storage: %w", path, err)
+				}
+				if actual != expected {
+					return fmt.Errorf("source evidence %s changed before knowledge storage: %w", path, agent.ErrSupplementUnresolved)
 				}
 			}
 		}
@@ -73,6 +76,9 @@ func (r *learnCurrentProjectRun) normalizeAndSavePatternsStep() error {
 			}
 		}
 		if !r.sourceBaselineCommitted() {
+			if input := agent.CurrentLearningSupplement(r.ctx); input != nil && input.Partial {
+				return nil
+			}
 			r.detail(stepLabel, "ProgressLearnCurrentCommitFiles", map[string]interface{}{
 				"Count": len(r.incrementalChanges.Records) + len(r.incrementalChanges.Deleted),
 			})

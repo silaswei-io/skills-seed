@@ -29,7 +29,7 @@ const (
 	// supplementSingleSourceLimit 为单文件证据保留结构化请求和提示词空间。
 	supplementSingleSourceLimit = agent.SupplementInputLimit - 32*1024
 	// supplementEvidenceRevision 在证据选择策略变化后使旧的容量阻塞记录失效。
-	supplementEvidenceRevision = 1
+	supplementEvidenceRevision = 2
 )
 
 var errSupplementEvidenceCapacity = errors.New("supplement evidence exceeds safe capacity")
@@ -43,12 +43,19 @@ func (e supplementCapacityError) Is(target error) bool {
 }
 
 type semanticGap struct {
-	Path     string   `json:"path"`
-	Reason   string   `json:"reason"`
-	Priority int      `json:"priority"`
-	Symbols  []string `json:"-"`
-	Related  []string `json:"-"`
-	Existing bool     `json:"-"`
+	Path     string             `json:"path"`
+	Reason   string             `json:"reason"`
+	Priority int                `json:"priority"`
+	Symbols  []string           `json:"-"`
+	Related  []string           `json:"-"`
+	Existing bool               `json:"-"`
+	Failure  *supplementFailure `json:"failure,omitempty"`
+}
+
+// supplementFailure 保留每个候选的失败阶段与原因，不用最后一个错误覆盖其他候选。
+type supplementFailure struct {
+	Stage  string `json:"stage"`
+	Reason string `json:"reason"`
 }
 
 type supplementStatus struct {
@@ -70,7 +77,19 @@ type supplementBlock struct {
 	Revision   int    `json:"revision"`
 }
 
-func supplementInputHash(index *codegraph.Index, gap semanticGap, patterns []domain.Pattern) string {
+func (s *supplementStatus) fail(paths []string, stage string, err error) {
+	for i := range s.Pending {
+		for _, path := range paths {
+			if s.Pending[i].Path == path {
+				s.Pending[i].Failure = &supplementFailure{Stage: stage, Reason: err.Error()}
+				break
+			}
+		}
+	}
+	s.LastError = fmt.Sprintf("%s: %s", strings.Join(paths, ", "), err)
+}
+
+func supplementInputHash(root string, index *codegraph.Index, gap semanticGap, patterns []domain.Pattern) string {
 	ids := append(append([]string(nil), gap.Symbols...), gap.Related...)
 	sort.Strings(ids)
 	wanted := make(map[string]bool, len(ids))
@@ -91,9 +110,13 @@ func supplementInputHash(index *codegraph.Index, gap semanticGap, patterns []dom
 		EndLine   int
 	}
 	selected := make([]symbol, 0, len(ids))
+	paths := map[string]bool{gap.Path: true}
 	for _, id := range ids {
 		node := nodes[id]
 		selected = append(selected, symbol{ID: id, Path: node.Path, Signature: node.Signature, Line: node.Line, EndLine: node.EndLine})
+		if node.Path != "" {
+			paths[node.Path] = true
+		}
 	}
 	related := make([]domain.Pattern, 0)
 	for _, pattern := range domain.ActivePatterns(patterns) {
@@ -103,15 +126,27 @@ func supplementInputHash(index *codegraph.Index, gap semanticGap, patterns []dom
 		for _, evidence := range pattern.EvidenceLocations {
 			if evidence.Path == gap.Path {
 				related = append(related, pattern)
+				for _, source := range pattern.EvidenceLocations {
+					paths[source.Path] = true
+				}
 				break
 			}
 		}
 	}
 	sort.Slice(related, func(i, j int) bool { return related[i].ID < related[j].ID })
+	sources := make(map[string]string, len(paths))
+	for path := range paths {
+		digest, err := sourcecode.EvidenceDigest(root, path)
+		if err != nil {
+			digest = err.Error()
+		}
+		sources[path] = digest
+	}
 	data, _ := json.Marshal(struct {
 		Symbols  []symbol
 		Patterns []domain.Pattern
-	}{selected, related})
+		Sources  map[string]string
+	}{selected, related, sources})
 	return fmt.Sprintf("%x", sha256.Sum256(data))
 }
 
@@ -536,13 +571,17 @@ func supplementSource(path string, data []byte, ids []string, anchors []int, ful
 	for _, id := range ids {
 		node, ok := nodes[id]
 		if !ok || node.Path != path || node.Line < 1 || node.EndLine < node.Line || node.EndLine > len(lines) {
-			return "", nil, agent.ErrSupplementUnresolved
+			return "", nil, fmt.Errorf("source evidence %s: symbol %q has invalid range %d-%d in current file (%d lines): %w", path, id, node.Line, node.EndLine, len(lines), agent.ErrSupplementUnresolved)
 		}
 		spans = append(spans, span{node.Line, node.EndLine})
 	}
 	for _, line := range anchors {
 		if line < 1 || line > len(lines) {
-			return "", nil, agent.ErrSupplementUnresolved
+			// 历史行号只用于导航；越界时提供完整当前文件重新核验，不能猜测或截断到新位置。
+			if len(data) <= limit {
+				return string(data), []agent.SourceRange{{Start: 1, End: len(lines)}}, nil
+			}
+			return "", nil, supplementCapacityError(fmt.Sprintf("source evidence %s: stored anchor %d is outside current file (%d lines); full current source is %d bytes, exceeds %d-byte safety limit", path, line, len(lines), len(data), limit))
 		}
 		start, end := max(1, line-8), min(len(lines), line+8)
 		for _, node := range pathNodes {
@@ -659,9 +698,9 @@ func supplementLocalProjectWithSteps(ctx context.Context, cont *container.Contai
 		if !opts.force && !opts.semantic && len(opts.focusPaths) == 0 {
 			for _, gap := range status.Pending {
 				block := previous.Blocked[gap.Path]
-				if hashes[gap.Path] != "" && block.SourceHash == hashes[gap.Path] && block.InputHash == supplementInputHash(index, gap, patterns) && block.Revision == supplementEvidenceRevision {
+				if hashes[gap.Path] != "" && block.SourceHash == hashes[gap.Path] && block.InputHash == supplementInputHash(root, index, gap, patterns) && block.Revision == supplementEvidenceRevision {
 					status.Blocked[gap.Path] = block
-					status.LastError = block.Reason
+					status.fail([]string{gap.Path}, "evidence", errors.New(block.Reason))
 				}
 			}
 		}
@@ -783,13 +822,23 @@ func supplementLocalProjectWithSteps(ctx context.Context, cont *container.Contai
 				break
 			}
 			input, err := supplementBatch(root, index, pending, patterns)
+			var parts []*agent.LearningSupplement
+			if errors.Is(err, errSupplementEvidenceCapacity) {
+				wholeErr := err
+				parts, err = supplementParts(root, index, pending[0], patterns)
+				if err == nil {
+					input = parts[0]
+				} else {
+					err = fmt.Errorf("%v; cannot assemble evidence parts: %w", wholeErr, err)
+				}
+			}
 			if errors.Is(err, agent.ErrSupplementUnresolved) {
-				status.LastError = err.Error()
 				gap := pending[0]
+				status.fail([]string{gap.Path}, "evidence", err)
 				if errors.Is(err, errSupplementEvidenceCapacity) {
 					for _, record := range changes.Records {
 						if record.Path == gap.Path && record.Hash != "" {
-							status.Blocked[gap.Path] = supplementBlock{SourceHash: record.Hash, InputHash: supplementInputHash(index, gap, patterns), Reason: err.Error(), Revision: supplementEvidenceRevision}
+							status.Blocked[gap.Path] = supplementBlock{SourceHash: record.Hash, InputHash: supplementInputHash(root, index, gap, patterns), Reason: err.Error(), Revision: supplementEvidenceRevision}
 							break
 						}
 					}
@@ -812,13 +861,15 @@ func supplementLocalProjectWithSteps(ctx context.Context, cont *container.Contai
 				}
 			}
 			pending = remaining
-			jobs = append(jobs, supplementJob{number: len(jobs) + 1, input: input})
+			jobs = append(jobs, supplementJob{number: len(jobs) + 1, input: input, parts: parts})
 		}
 		if len(jobs) == 0 {
 			return nil
 		}
 		if err := commandutil.RequireAgentAvailable(cont); err != nil {
-			status.LastError = err.Error()
+			for _, job := range jobs {
+				status.fail(job.input.Focus.EntryPaths, "agent", err)
+			}
 			return nil
 		}
 		if steps != nil {
@@ -838,17 +889,30 @@ func supplementLocalProjectWithSteps(ctx context.Context, cont *container.Contai
 					"Batch": outcome.job.number, "Completed": processed, "Total": status.SemanticCandidates,
 				}))
 			}
+			learned := outcome.result
+			if learned != nil {
+				result.patternsCount += learned.patternsCount
+				result.savedCount += learned.savedCount
+				result.retiredCount += learned.retiredCount
+				result.droppedCount += learned.droppedCount
+				result.dropped = append(result.dropped, learned.dropped...)
+				result.skipped = result.skipped && learned.skipped
+			}
 			if outcome.err != nil {
-				status.LastError = outcome.err.Error()
+				status.fail(outcome.job.input.Focus.EntryPaths, "learning", outcome.err)
 				continue
 			}
-			learned := outcome.result
-			result.patternsCount += learned.patternsCount
-			result.savedCount += learned.savedCount
-			result.retiredCount += learned.retiredCount
-			result.droppedCount += learned.droppedCount
-			result.dropped = append(result.dropped, learned.dropped...)
-			result.skipped = result.skipped && learned.skipped
+			if len(outcome.job.parts) > 0 {
+				if err := commitSupplementParts(ctx, cont, root, changes, outcome.job); err != nil {
+					status.fail(outcome.job.input.Focus.EntryPaths, "commit", err)
+					continue
+				}
+				for _, input := range outcome.job.parts {
+					if err := learnCurrentStateRepo(cont.SeedPath, supplementStateScope(opts, input)).Clear(); err != nil && saveErr == nil {
+						saveErr = err
+					}
+				}
+			}
 			owned := make(map[string]bool, len(outcome.job.input.Focus.EntryPaths))
 			for _, path := range outcome.job.input.Focus.EntryPaths {
 				owned[path] = true

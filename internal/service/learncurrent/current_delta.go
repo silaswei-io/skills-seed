@@ -141,9 +141,12 @@ func (r *learnCurrentProjectRun) relatedPatternsByFocus(ctx context.Context, foc
 	}
 	for _, focus := range focuses {
 		focusPaths := relativeEvidenceFocusPaths(r.projectRoot, focus.FocusAbsPaths)
-		if agent.CurrentLearningSupplement(ctx) != nil {
+		if input := agent.CurrentLearningSupplement(ctx); input != nil {
 			var exact []domain.Pattern
 			for _, pattern := range patterns {
+				if input.PatternIDs != nil && !slices.Contains(input.PatternIDs, pattern.ID) {
+					continue
+				}
 				for _, evidence := range pattern.EvidenceLocations {
 					if slices.Contains(focusPaths, evidence.Path) {
 						exact = append(exact, pattern)
